@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0E1433">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Nifty 50 Cockpit</title>
 <script>
   // Demo login guard: send visitors to the sign-in page until they log in (see login.html)
@@ -45,6 +50,8 @@
   .topbar-in { max-width:1360px; margin:auto; padding:10px 18px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
   .brand { font-family:var(--display); font-weight:700; font-size:19px; letter-spacing:.04em; margin-right:auto; }
   .brand span { color:var(--ion); }
+  .brand { display:flex; align-items:center; gap:10px; }
+  .brand img { flex:none; display:block; }
   .stamp { display:flex; align-items:center; gap:10px; padding:6px 12px; border:1px solid var(--line-soft);
            background:rgba(69,216,255,.06); border-radius:6px; }
   .stamp b { font-family:var(--display); font-weight:600; font-size:14px; display:block; line-height:1.2; }
@@ -275,7 +282,7 @@
 <body>
 
 <div class="topbar"><div class="topbar-in">
-  <div class="brand">NIFTY<span>/</span>COCKPIT</div>
+  <div class="brand"><img src="icons/icon.svg" alt="" width="30" height="30">NIFTY<span>/</span>COCKPIT</div>
   <div class="stamp" id="stamp" title="When this page's data was last refreshed">
     <span class="dot" id="dot"></span>
     <div><b id="updated">Loading…</b><span class="small mut" id="nextUpd"></span></div>
