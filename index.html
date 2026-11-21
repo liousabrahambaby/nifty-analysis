@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nifty 50 – EOD Analysis</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root { --bg:#0f1218; --card:#171b24; --line:#262c38; --txt:#e6e9ef; --mut:#8b93a5;
+          --up:#22c55e; --dn:#ef4444; --acc:#60a5fa; --warn:#f59e0b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--txt); }
+  header { padding:14px 20px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:12px;
+           align-items:center; justify-content:space-between; }
+  h1 { font-size:20px; margin:0; }
+  .price { font-size:28px; font-weight:700; } .chg { font-size:16px; margin-left:8px; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; }
+  .chip { background:var(--card); border:1px solid var(--line); border-radius:999px; padding:5px 12px; font-size:13px; }
+  .mut { color:var(--mut); font-size:13px; }
+  main { padding:16px; display:grid; gap:16px; grid-template-columns:1fr; max-width:1400px; margin:auto; }
+  @media (min-width:1000px){ main { grid-template-columns:3fr 1fr; } .full { grid-column:1 / -1; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; min-width:0; }
+  .card h2 { font-size:14px; text-transform:uppercase; letter-spacing:.05em; color:var(--mut); margin:0 0 10px; }
+  .controls { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+  button, label.tog { background:#1f2430; color:var(--txt); border:1px solid var(--line); border-radius:8px;
+                      padding:6px 10px; font-size:13px; cursor:pointer; }
+  button.on { background:var(--acc); color:#000; border-color:var(--acc); }
+  label.tog input { margin-right:4px; }
+  #chart { height:620px; } #oiChart, #vixChart, #cumChart { height:300px; }
+  .bias { font-size:22px; font-weight:700; padding:10px; border-radius:8px; text-align:center; margin-bottom:10px; }
+  .call { background:rgba(34,197,94,.15); color:var(--up); }
+  .put  { background:rgba(239,68,68,.15); color:var(--dn); }
+  .none { background:rgba(245,158,11,.12); color:var(--warn); }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  td, th { padding:6px 4px; border-bottom:1px solid var(--line); text-align:left; }
+  .kv td:last-child { text-align:right; font-variant-numeric:tabular-nums; }
+  ul { padding-left:18px; margin:6px 0; font-size:13px; line-height:1.6; }
+  .side { display:grid; gap:16px; align-content:start; }
+  .disc { font-size:12px; color:var(--mut); line-height:1.5; }
+  .meter { height:8px; border-radius:4px; background:linear-gradient(90deg,var(--dn),#444 50%,var(--up)); position:relative; margin:8px 0 4px; }
+  .meter span { position:absolute; top:-4px; width:4px; height:16px; background:#fff; border-radius:2px; }
+  .grid2 { display:grid; gap:16px; grid-template-columns:1fr; }
+  @media (min-width:800px){ .grid2 { grid-template-columns:1fr 1fr; } }
+  .tiles { display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); margin-bottom:12px; }
+  .tile { background:#1f2430; border-radius:10px; padding:10px; }
+  .tile b { display:block; font-size:20px; margin-top:2px; font-variant-numeric:tabular-nums; }
+  .warnbox { background:rgba(245,158,11,.12); color:var(--warn); padding:8px 10px; border-radius:8px; font-size:13px; margin-bottom:10px; }
+  .tablewrap { max-height:420px; overflow:auto; }
+  #trackTable th { position:sticky; top:0; background:var(--card); color:var(--mut); font-weight:500; font-size:12px; }
+  #trackTable td { font-size:13px; white-space:nowrap; }
+  .pill { padding:2px 8px; border-radius:999px; font-size:12px; font-weight:600; }
+  .pos { color:var(--up); } .neg { color:var(--dn); }
+</style>
+</head>
+<body>
+<header>
+  <div><h1 id="sym">NIFTY 50</h1><div class="mut" id="upd">Loading…</div></div>
+  <div class="chips"><span class="chip" id="vixChip">VIX –</span><span class="chip" id="pcrChip">PCR –</span></div>
+  <div><span class="price" id="px">–</span><span class="chg" id="chg"></span></div>
+</header>
+
+<main>
+  <!-- ===== Price chart ===== -->
+  <section class="card">
+    <div class="controls ranges">
+      <button data-d="22">1M</button><button data-d="66">3M</button>
+      <button data-d="132" class="on">6M</button><button data-d="252">1Y</button><button data-d="0">All</button>
+    </div>
+    <div class="controls">
+      <label class="tog"><input type="checkbox" data-t="sma20" checked>SMA 20</label>
+      <label class="tog"><input type="checkbox" data-t="sma50" checked>SMA 50</label>
+      <label class="tog"><input type="checkbox" data-t="sma200">SMA 200</label>
+      <label class="tog"><input type="checkbox" data-t="bb">Bollinger</label>
+      <label class="tog"><input type="checkbox" data-t="lv" checked>Pivot levels</label>
+      <label class="tog"><input type="checkbox" data-t="oi" checked>OI walls</label>
+      <label class="tog"><input type="checkbox" data-t="sig" checked>Past signals</label>
+    </div>
+    <div id="chart"></div>
+  </section>
+
+  <!-- ===== Side panels ===== -->
+  <div class="side">
+    <section class="card">
+      <h2>Next-session view</h2>
+      <div class="bias" id="bias">–</div>
+      <div class="mut">Signal strength (−6.5 bearish → +6.5 bullish): <b id="score"></b></div>
+      <div class="meter"><span id="needle"></span></div>
+      <table class="kv" id="plan"></table>
+      <ul id="reasons"></ul>
+    </section>
+    <section class="card">
+      <h2>Key levels</h2>
+      <table class="kv" id="levels"></table>
+      <div class="mut" style="margin-top:8px">Expected range (±1 ATR): <b id="rng"></b></div>
+      <div class="mut">VIX-implied 1-day move: <b id="vixMove">–</b></div>
+    </section>
+    <section class="card">
+      <h2>Rule backtest (2 yrs)</h2>
+      <table class="kv" id="bt"></table>
+      <div class="mut" style="margin-top:6px" id="base"></div>
+    </section>
+  </div>
+
+  <!-- ===== Options & volatility ===== -->
+  <section class="card full">
+    <h2>Option chain &amp; volatility</h2>
+    <div id="ocWarn"></div>
+    <div class="tiles" id="ocTiles"></div>
+    <div class="grid2">
+      <div>
+        <div class="controls oiMode">
+          <button data-m="oi" class="on">Open interest</button><button data-m="chg">Change in OI</button>
+        </div>
+        <div id="oiChart"></div>
+        <div class="mut">Big call OI above price often acts as resistance; big put OI below acts as support.</div>
+      </div>
+      <div>
+        <div class="controls"><span class="mut" style="padding:6px 0">India VIX (follows the range buttons above)</span></div>
+        <div id="vixChart"></div>
+        <div class="mut">Above 20 = high fear and expensive premiums. Below 12 = calm, cheap premiums.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Track record ===== -->
+  <section class="card full">
+    <h2>Signal track record</h2>
+    <div class="controls trackScope">
+      <button data-s="live" class="on">Live signals only</button><button data-s="all">Include backfilled</button>
+    </div>
+    <div class="tiles" id="trackTiles"></div>
+    <div class="grid2">
+      <div><div id="cumChart"></div></div>
+      <div>
+        <div class="controls trackFilter">
+          <button data-f="all" class="on">All</button><button data-f="CALL">Calls</button>
+          <button data-f="PUT">Puts</button><button data-f="NONE">No-trade</button>
+        </div>
+        <div class="tablewrap"><table id="trackTable"></table></div>
+      </div>
+    </div>
+    <p class="mut">Each signal is graded as a 1-day plan on the next session: entry at R1 (calls) or S1 (puts), target R2/S2,
+      stop at the pivot. Points are <b>Nifty index points</b>, not option premium. Daily bars don't show which level was
+      hit first, so if both stop and target were touched it counts as a loss. "Backfilled" rows are past days graded
+      on the first run using technical rules only (no VIX/option-chain inputs).</p>
+  </section>
+
+  <section class="card full disc">
+    Educational tool only — not investment advice. Signals come from simple rules and are often wrong. Buying options can
+    lose 100% of the premium quickly. SEBI's study found the large majority of individual F&amp;O traders lose money.
+    Option-chain data is from NSE and may be missing or delayed. Consult a SEBI-registered adviser before trading.
+  </section>
+</main>
+
+<script>
+let D, days = 132, oiMode = 'oi', scope = 'live', filt = 'all';
+const show = { sma20:true, sma50:true, sma200:false, bb:false, lv:true, oi:true, sig:true };
+const fmt = (n, d = 2) => n == null ? '–' : n.toLocaleString('en-IN', { maximumFractionDigits:d });
+const $ = id => document.getElementById(id);
+const AX = { gridcolor:'#262c38', zerolinecolor:'#262c38' };
+const BASE = { paper_bgcolor:'transparent', plot_bgcolor:'transparent', font:{ color:'#cbd5e1', size:11 } };
+const CFG = { responsive:true, displaylogo:false };
+const cls = b => b.startsWith('CALL') ? 'call' : b.startsWith('PUT') ? 'put' : 'none';
+
+fetch('data.json?t=' + Date.now()).then(r => r.json()).then(d => { D = d; render(); drawAll(); })
+  .catch(() => $('upd').textContent = 'Could not load data.json – run analyze.py first');
+
+function render() {
+  const L = D.last, S = D.signal, V = D.vix, O = D.option_chain;
+  $('sym').textContent = D.symbol;
+  $('upd').textContent = `Data as of ${D.as_of} · updated ${D.updated}`;
+  $('px').textContent = fmt(L.close);
+  $('chg').textContent = `${L.change >= 0 ? '▲' : '▼'} ${fmt(L.change)} (${L.change_pct}%)`;
+  $('chg').style.color = L.change >= 0 ? 'var(--up)' : 'var(--dn)';
+  $('vixChip').textContent = V ? `India VIX ${V.value} (${V.change_pct > 0 ? '+' : ''}${V.change_pct}%)` : 'VIX n/a';
+  $('pcrChip').textContent = O ? `PCR ${O.pcr}${O.stale ? ' (old)' : ''}` : 'PCR n/a';
+
+  $('bias').textContent = S.bias; $('bias').className = 'bias ' + cls(S.bias);
+  $('score').textContent = S.score;
+  $('needle').style.left = `calc(${Math.min(100, Math.max(0, (S.score + 6.5) / 13 * 100))}% - 2px)`;
+  $('plan').innerHTML = Object.entries(S.plan).map(([k, v]) =>
+    `<tr><td class="mut">${k[0].toUpperCase() + k.slice(1)}</td><td>${v}</td></tr>`).join('');
+  $('reasons').innerHTML = S.reasons.map(r => `<li>${r}</li>`).join('');
+
+  $('levels').innerHTML = Object.entries(D.levels).map(([k, v]) => `<tr><td>${k}</td><td>${fmt(v, 1)}</td></tr>`).join('');
+  $('rng').textContent = `${fmt(D.expected_range[0], 0)} – ${fmt(D.expected_range[1], 0)}`;
+  $('vixMove').textContent = V ? `± ${fmt(V.day_move, 0)} pts` : 'n/a';
+
+  const b = D.backtest, row = (n, x) => `<tr><td>${n} (${x.signals})</td><td>1d ${x.hit_1d ?? '–'}% · 5d ${x.hit_5d ?? '–'}%</td></tr>`;
+  $('bt').innerHTML = row('Call signals', b.call) + row('Put signals', b.put);
+  $('base').textContent = `% of times the market moved the signal's way. Baseline: ${b.base_up_days_pct}% of days closed up. ${b.note}.`;
+
+  // option chain tiles
+  if (!O) {
+    $('ocWarn').innerHTML = `<div class="warnbox">Option-chain data couldn't be fetched from NSE yet. NSE often blocks cloud servers –
+      see the README for running the update from your own PC.</div>`;
+  } else {
+    if (O.stale) $('ocWarn').innerHTML = `<div class="warnbox">Today's NSE fetch failed – showing the last saved snapshot from ${O.fetched_at}.
+      It is not used in today's signal.</div>`;
+    const t = [['Expiry', O.expiry], ['PCR (OI)', O.pcr], ['PCR (change in OI)', O.pcr_chg_oi ?? '–'],
+               ['Max pain', fmt(O.max_pain, 0)], ['Call-OI wall', fmt(O.max_ce_oi_strike, 0)],
+               ['Put-OI wall', fmt(O.max_pe_oi_strike, 0)]];
+    if (V) t.push(['India VIX', V.value]);
+    $('ocTiles').innerHTML = t.map(([k, v]) => `<div class="tile"><span class="mut">${k}</span><b>${v}</b></div>`).join('');
+  }
+  renderTrack();
+}
+
+function drawAll() { drawPrice(); drawOI(); drawVix(); }
+
+function drawPrice() {
+  const n = D.dates.length, s = days ? Math.max(0, n - days) : 0;
+  const cut = a => a.slice(s), x = cut(D.dates);
+  const line = (y, name, color, extra = {}) => ({ x, y: cut(y), name, type:'scatter', mode:'lines', line:{ width:1.4, color }, ...extra });
+  const t = [{ x, open:cut(D.open), high:cut(D.high), low:cut(D.low), close:cut(D.close), type:'candlestick', name:'Nifty',
+               increasing:{ line:{ color:'#22c55e' } }, decreasing:{ line:{ color:'#ef4444' } } }];
+  if (show.sma20) t.push(line(D.sma20, 'SMA 20', '#60a5fa'));
+  if (show.sma50) t.push(line(D.sma50, 'SMA 50', '#f59e0b'));
+  if (show.sma200) t.push(line(D.sma200, 'SMA 200', '#c084fc'));
+  if (show.bb) {
+    t.push(line(D.bb_up, 'BB upper', '#64748b', { line:{ dash:'dot', width:1 } }));
+    t.push(line(D.bb_lo, 'BB lower', '#64748b', { line:{ dash:'dot', width:1 }, fill:'tonexty', fillcolor:'rgba(100,116,139,.08)' }));
+  }
+  if (show.sig) {
+    const sc = cut(D.score), lo = cut(D.low), hi = cut(D.high);
+    const pick = f => x.map((_, i) => i).filter(i => f(sc[i]) && (i === 0 || !f(sc[i - 1])));
+    const ci = pick(v => v >= 2.5), pi = pick(v => v <= -2.5);
+    t.push({ x: ci.map(i => x[i]), y: ci.map(i => lo[i] * .995), mode:'markers', type:'scatter', name:'Call bias',
+             marker:{ symbol:'triangle-up', size:10, color:'#22c55e' } });
+    t.push({ x: pi.map(i => x[i]), y: pi.map(i => hi[i] * 1.005), mode:'markers', type:'scatter', name:'Put bias',
+             marker:{ symbol:'triangle-down', size:10, color:'#ef4444' } });
+  }
+  t.push({ ...line(D.rsi, 'RSI', '#a78bfa'), yaxis:'y2' });
+  const hist = cut(D.macd_hist);
+  t.push({ x, y:hist, type:'bar', name:'MACD hist', yaxis:'y3', marker:{ color: hist.map(v => v >= 0 ? '#22c55e' : '#ef4444') } });
+  t.push({ ...line(D.macd, 'MACD', '#60a5fa'), yaxis:'y3' });
+  t.push({ ...line(D.macd_sig, 'Signal', '#f59e0b'), yaxis:'y3' });
+
+  const shapes = [70, 30].map(v => ({ type:'line', xref:'paper', x0:0, x1:1, yref:'y2', y0:v, y1:v, line:{ color:'#475569', dash:'dot', width:1 } }));
+  const ann = [];
+  const hline = (v, label, c, dash) => {
+    shapes.push({ type:'line', xref:'paper', x0:.8, x1:1, yref:'y', y0:v, y1:v, line:{ color:c, width:1, dash } });
+    ann.push({ xref:'paper', x:1, y:v, yref:'y', text:`${label} ${Math.round(v)}`, showarrow:false, xanchor:'right', yanchor:'bottom', font:{ size:10, color:c } });
+  };
+  if (show.lv) ['R2', 'R1', 'Pivot', 'S1', 'S2'].forEach(k =>
+    hline(D.levels[k], k, k[0] === 'R' ? '#ef4444' : k[0] === 'S' ? '#22c55e' : '#e5e7eb', 'dash'));
+  if (show.oi && D.option_chain) {
+    hline(D.option_chain.max_ce_oi_strike, 'Call wall', '#fb7185', 'dot');
+    hline(D.option_chain.max_pe_oi_strike, 'Put wall', '#4ade80', 'dot');
+  }
+  Plotly.react('chart', t, { ...BASE, margin:{ l:50, r:10, t:10, b:30 }, legend:{ orientation:'h', y:1.06 },
+    hovermode:'x unified', shapes, annotations:ann,
+    xaxis:{ ...AX, rangeslider:{ visible:false }, type:'category', nticks:8 },
+    yaxis:{ ...AX, domain:[.42, 1], title:'Price' }, yaxis2:{ ...AX, domain:[.22, .38], range:[0, 100], title:'RSI' },
+    yaxis3:{ ...AX, domain:[0, .18], title:'MACD' } }, CFG);
+}
+
+function drawOI() {
+  const O = D.option_chain;
+  if (!O) { $('oiChart').innerHTML = '<p class="mut">No option-chain data.</p>'; return; }
+  const ce = oiMode === 'oi' ? O.ce_oi : O.ce_chg, pe = oiMode === 'oi' ? O.pe_oi : O.pe_chg;
+  const x = O.strikes.map(String);
+  Plotly.react('oiChart', [
+    { x, y:ce, type:'bar', name:'Call (CE)', marker:{ color:'#ef4444' } },
+    { x, y:pe, type:'bar', name:'Put (PE)', marker:{ color:'#22c55e' } },
+  ], { ...BASE, barmode:'group', margin:{ l:55, r:10, t:10, b:40 }, legend:{ orientation:'h', y:1.12 },
+       hovermode:'x unified', xaxis:{ ...AX, type:'category', title:'Strike', nticks:12 }, yaxis:{ ...AX, title: oiMode === 'oi' ? 'Open interest' : 'Change in OI' },
+       shapes:[{ type:'line', x0:String(Math.round(O.spot / 50) * 50), x1:String(Math.round(O.spot / 50) * 50), yref:'paper', y0:0, y1:1, line:{ color:'#e5e7eb', dash:'dot' } }],
+       annotations:[{ x:String(Math.round(O.spot / 50) * 50), yref:'paper', y:1, text:`Spot ${fmt(O.spot, 0)}`, showarrow:false, yanchor:'bottom', font:{ size:10 } }] }, CFG);
+}
+
+function drawVix() {
+  if (!D.vix_series.length) { $('vixChart').innerHTML = '<p class="mut">No VIX data.</p>'; return; }
+  const n = D.dates.length, s = days ? Math.max(0, n - days) : 0;
+  Plotly.react('vixChart', [{ x:D.dates.slice(s), y:D.vix_series.slice(s), type:'scatter', mode:'lines', name:'India VIX',
+      line:{ color:'#f59e0b', width:1.6 }, fill:'tozeroy', fillcolor:'rgba(245,158,11,.08)' }],
+    { ...BASE, margin:{ l:40, r:10, t:10, b:30 }, showlegend:false, hovermode:'x unified',
+      xaxis:{ ...AX, type:'category', nticks:6 }, yaxis:{ ...AX, title:'VIX' },
+      shapes:[20, 12].map(v => ({ type:'line', xref:'paper', x0:0, x1:1, y0:v, y1:v, line:{ color:'#475569', dash:'dot', width:1 } })) }, CFG);
+}
+
+function renderTrack() {
+  const T = D.track, S = T.summary[scope];
+  const pct = v => v == null ? '–' : v + '%';
+  $('trackTiles').innerHTML = [
+    ['Trade signals', S.signals], ['Triggered', S.triggered], ['Win rate (triggered)', pct(S.win_rate)],
+    ['Direction correct', pct(S.direction_ok)],
+    ['Net points', `<span class="${S.total_points >= 0 ? 'pos' : 'neg'}">${S.total_points >= 0 ? '+' : ''}${fmt(S.total_points, 1)}</span>`],
+    ['No-trade days in range', pct(S.no_trade_correct)],
+  ].map(([k, v]) => `<div class="tile"><span class="mut">${k}</span><b>${v}</b></div>`).join('');
+
+  let es = T.entries.filter(e => scope === 'all' || !e.backfilled);
+  // cumulative points chart (oldest → newest)
+  const graded = es.filter(e => e.outcome && e.bias !== 'NONE').slice().reverse();
+  let c = 0; const cum = graded.map(e => (c += e.outcome.points || 0));
+  if (graded.length) Plotly.react('cumChart', [{ x:graded.map(e => e.date), y:cum, type:'scatter', mode:'lines+markers',
+      line:{ color:'#60a5fa' }, marker:{ size:5, color:graded.map(e => e.outcome.points > 0 ? '#22c55e' : e.outcome.points < 0 ? '#ef4444' : '#64748b') } }],
+    { ...BASE, margin:{ l:50, r:10, t:30, b:40 }, showlegend:false, title:{ text:'Cumulative Nifty points', font:{ size:12 } },
+      xaxis:{ ...AX, type:'category', nticks:6 }, yaxis:{ ...AX } }, CFG);
+  else $('cumChart').innerHTML = '<p class="mut">No graded trade signals yet — results appear the trading day after each signal.</p>';
+
+  if (filt !== 'all') es = es.filter(e => e.bias === filt);
+  const lbl = { CALL:'CALL', PUT:'PUT', NONE:'NO TRADE' };
+  $('trackTable').innerHTML = '<tr><th>Date</th><th>Signal</th><th>Close</th><th>Next close</th><th>Result</th><th>Pts</th></tr>' +
+    es.map(e => {
+      const o = e.outcome;
+      return `<tr><td>${e.date}${e.backfilled ? ' <span class="mut">·bf</span>' : ''}</td>
+        <td><span class="pill ${cls(e.bias)}">${lbl[e.bias]}</span></td>
+        <td>${fmt(e.close, 0)}</td>
+        <td>${o ? `${fmt(o.next_close, 0)} <span class="${o.move >= 0 ? 'pos' : 'neg'}">(${o.move >= 0 ? '+' : ''}${fmt(o.move, 0)})</span>` : '<span class="mut">pending</span>'}</td>
+        <td>${o ? o.result : '<span class="mut">next session</span>'}</td>
+        <td class="${o && o.points > 0 ? 'pos' : o && o.points < 0 ? 'neg' : ''}">${o && o.points != null ? fmt(o.points, 1) : '–'}</td></tr>`;
+    }).join('');
+}
+
+const group = (sel, fn) => document.querySelectorAll(sel + ' button').forEach(b => b.onclick = () => {
+  document.querySelectorAll(sel + ' button').forEach(x => x.classList.remove('on')); b.classList.add('on'); fn(b.dataset);
+});
+group('.ranges', d => { days = +d.d; drawPrice(); drawVix(); });
+group('.oiMode', d => { oiMode = d.m; drawOI(); });
+group('.trackScope', d => { scope = d.s; renderTrack(); });
+group('.trackFilter', d => { filt = d.f; renderTrack(); });
+document.querySelectorAll('[data-t]').forEach(c => c.onchange = () => { show[c.dataset.t] = c.checked; drawPrice(); });
+</script>
+</body>
+</html>
