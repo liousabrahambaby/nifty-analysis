@@ -3,320 +3,762 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nifty 50 – EOD Analysis</title>
+<meta name="theme-color" content="#0E1433">
+<title>Nifty 50 Cockpit</title>
+<script>
+  // Demo login guard: send visitors to the sign-in page until they log in (see login.html)
+  if (sessionStorage.getItem('nc_auth') !== '1' && localStorage.getItem('nc_auth') !== '1') location.replace('login.html');
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <style>
-  :root { --bg:#0f1218; --card:#171b24; --line:#262c38; --txt:#e6e9ef; --mut:#8b93a5;
-          --up:#22c55e; --dn:#ef4444; --acc:#60a5fa; --warn:#f59e0b; }
+  :root {
+    --space:#0E1433; --panel:rgba(23,31,74,.78); --panel-solid:#171F4A; --line:#2A3570; --line-soft:rgba(69,216,255,.14);
+    --ion:#45D8FF; --bull:#2EE59D; --bear:#FF5C7A; --amber:#FFB547; --violet:#A48BFF;
+    --txt:#E8ECFF; --mut:#8E98C8;
+    --display:'Chakra Petch', 'Sora', system-ui, sans-serif; --body:'Sora', system-ui, sans-serif;
+    --chamfer:polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+  }
   * { box-sizing:border-box; }
-  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--txt); }
-  header { padding:14px 20px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:12px;
-           align-items:center; justify-content:space-between; }
-  h1 { font-size:20px; margin:0; }
-  .price { font-size:28px; font-weight:700; } .chg { font-size:16px; margin-left:8px; }
-  .chips { display:flex; gap:8px; flex-wrap:wrap; }
-  .chip { background:var(--card); border:1px solid var(--line); border-radius:999px; padding:5px 12px; font-size:13px; }
-  .mut { color:var(--mut); font-size:13px; }
-  main { padding:16px; display:grid; gap:16px; grid-template-columns:1fr; max-width:1400px; margin:auto; }
-  @media (min-width:1000px){ main { grid-template-columns:3fr 1fr; } .full { grid-column:1 / -1; } }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; min-width:0; }
-  .card h2 { font-size:14px; text-transform:uppercase; letter-spacing:.05em; color:var(--mut); margin:0 0 10px; }
+  html { -webkit-text-size-adjust:100%; }
+  body {
+    margin:0; font-family:var(--body); font-size:15px; line-height:1.55; color:var(--txt); background:var(--space);
+    background-image:
+      radial-gradient(1100px 520px at 75% -10%, rgba(69,216,255,.16), transparent 60%),
+      radial-gradient(900px 600px at -10% 10%, rgba(164,139,255,.12), transparent 60%),
+      linear-gradient(rgba(69,216,255,.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(69,216,255,.035) 1px, transparent 1px);
+    background-size:auto, auto, 44px 44px, 44px 44px; background-attachment:fixed;
+    min-height:100vh;
+  }
+  .num { font-family:var(--display); font-variant-numeric:tabular-nums; letter-spacing:.01em; }
+  .mut { color:var(--mut); }
+  .small { font-size:13px; }
+  .pos { color:var(--bull); } .neg { color:var(--bear); }
+  :focus-visible { outline:2px solid var(--ion); outline-offset:2px; }
+
+  /* ---------- top bar ---------- */
+  .topbar { position:sticky; top:0; z-index:10; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+            background:rgba(14,20,51,.82); border-bottom:1px solid var(--line); }
+  .topbar-in { max-width:1360px; margin:auto; padding:10px 18px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  .brand { font-family:var(--display); font-weight:700; font-size:19px; letter-spacing:.04em; margin-right:auto; }
+  .brand span { color:var(--ion); }
+  .stamp { display:flex; align-items:center; gap:10px; padding:6px 12px; border:1px solid var(--line-soft);
+           background:rgba(69,216,255,.06); border-radius:6px; }
+  .stamp b { font-family:var(--display); font-weight:600; font-size:14px; display:block; line-height:1.2; }
+  .stamp .small { line-height:1.3; display:block; }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--bull); flex:none; box-shadow:0 0 0 0 rgba(46,229,157,.6); animation:pulse 2.4s infinite; }
+  .dot.late { background:var(--amber); box-shadow:0 0 0 0 rgba(255,181,71,.6); }
+  @keyframes pulse { 0% { box-shadow:0 0 0 0 currentColor; } 70% { box-shadow:0 0 0 9px rgba(0,0,0,0); } 100% { box-shadow:0 0 0 0 rgba(0,0,0,0); } }
+  .dot { color:rgba(46,229,157,.55); } .dot.late { color:rgba(255,181,71,.55); }
+
+  /* ---------- hero: price + level ladder ---------- */
+  .wrap { max-width:1360px; margin:auto; padding:18px; }
+  .hero { clip-path:var(--chamfer); background:linear-gradient(135deg, rgba(69,216,255,.12), rgba(164,139,255,.08) 60%, rgba(23,31,74,.6));
+          padding:20px 22px 16px; position:relative; }
+  .hero::before { content:''; position:absolute; inset:0; clip-path:var(--chamfer); pointer-events:none;
+                  background:linear-gradient(var(--space),var(--space)); opacity:0; }
+  .hero-top { display:flex; flex-wrap:wrap; gap:14px 28px; align-items:flex-end; }
+  .price { font-family:var(--display); font-weight:700; font-size:clamp(38px, 7vw, 60px); line-height:1; letter-spacing:.01em;
+           text-shadow:0 0 28px rgba(69,216,255,.35); }
+  .chg { font-family:var(--display); font-size:19px; font-weight:600; }
+  .sym { font-size:14px; color:var(--mut); margin-bottom:6px; }
+  .readouts { display:flex; gap:10px; flex-wrap:wrap; margin-left:auto; }
+  .readout { border-left:2px solid var(--line); padding:2px 12px; }
+  .readout span { display:block; font-size:12px; color:var(--mut); }
+  .readout b { font-family:var(--display); font-size:20px; font-weight:600; }
+  .readout.bias b.call { color:var(--bull); } .readout.bias b.put { color:var(--bear); } .readout.bias b.none { color:var(--amber); }
+
+  .ladder { position:relative; height:96px; margin:22px 8px 4px; }
+  .ladder .track { position:absolute; left:0; right:0; top:46px; height:4px; border-radius:2px;
+                   background:linear-gradient(90deg, rgba(46,229,157,.55), rgba(142,152,200,.35) 50%, rgba(255,92,122,.55)); }
+  .tick { position:absolute; top:38px; width:2px; height:20px; transform:translateX(-1px); background:var(--mut); }
+  .tick label { position:absolute; left:50%; transform:translateX(-50%); white-space:nowrap; font-size:11px; color:var(--mut); line-height:1.2; text-align:center; }
+  .tick.up label { bottom:24px; } .tick.down label { top:24px; }
+  .tick label b { display:block; font-family:var(--display); font-weight:600; font-size:12px; color:var(--txt); }
+  .tick.r { background:var(--bear); } .tick.s { background:var(--bull); } .tick.w { background:var(--violet); height:14px; top:41px; }
+  .marker { position:absolute; top:30px; width:0; transform:translateX(-50%); }
+  .marker::before { content:''; position:absolute; left:-9px; top:0; width:18px; height:36px; border-radius:3px;
+                    border:2px solid var(--ion); background:rgba(69,216,255,.18); box-shadow:0 0 18px rgba(69,216,255,.6); }
+  .ladder-legend { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--mut); margin:0 8px; }
+  .ladder-legend i { display:inline-block; width:10px; height:3px; margin-right:6px; vertical-align:middle; }
+
+  .signout { background:transparent; color:var(--mut); border:1px solid var(--line); border-radius:6px; padding:8px 12px;
+             font:500 13px var(--body); cursor:pointer; }
+  .signout:hover { color:var(--txt); border-color:var(--ion); }
+
+  /* ---------- alerts ---------- */
+  .alerts { margin-top:18px; }
+  .alerts-head { display:flex; align-items:baseline; gap:12px; margin-bottom:10px; }
+  .alerts-head h2 { font-family:var(--display); font-weight:600; font-size:19px; margin:0; }
+  .alert-list { display:grid; gap:10px; grid-template-columns:1fr; }
+  @media (min-width:900px){ .alert-list { grid-template-columns:repeat(3, 1fr); } }
+  .alert { position:relative; padding:14px 16px 14px 18px; border:1px solid var(--line); border-radius:6px; background:var(--panel);
+           backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); overflow:hidden; }
+  .alert::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--mut); }
+  .alert.high::before { background:var(--ion); box-shadow:0 0 14px var(--ion); }
+  .alert.medium::before { background:var(--violet); }
+  .alert.high { border-color:rgba(69,216,255,.45); background:linear-gradient(120deg, rgba(69,216,255,.12), var(--panel) 60%); }
+  .alert .kind { font:600 12px var(--display); letter-spacing:.04em; color:var(--mut); }
+  .alert.high .kind { color:var(--ion); } .alert.medium .kind { color:var(--violet); }
+  .alert .kind.up { color:var(--bull); } .alert .kind.down { color:var(--bear); }
+  .alert h3 { font-family:var(--display); font-weight:600; font-size:16px; line-height:1.3; margin:4px 0 6px; }
+  .alert p { margin:0; font-size:13px; color:#C9D0F0; line-height:1.55; }
+  .alert .lv { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+  .alert .lv span { font:600 13px var(--display); padding:2px 8px; border-radius:4px; background:rgba(14,20,51,.7); border:1px solid var(--line); }
+  .more { margin-top:10px; background:none; border:0; color:var(--ion); font:500 14px var(--body); cursor:pointer; padding:4px 0; }
+
+  /* ---------- news ---------- */
+  .newsblock { margin-top:22px; }
+  .news-grid { display:grid; gap:16px; grid-template-columns:1fr; }
+  @media (min-width:900px){ .news-grid { grid-template-columns:minmax(0,1fr) minmax(0,2.2fr); } }
+  .flow { padding:10px 0 14px; border-bottom:1px solid rgba(42,53,112,.7); }
+  .flow:last-of-type { border-bottom:0; }
+  .flow-top { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .flow-top span { color:var(--mut); font-size:13px; }
+  .flow-top b { font-family:var(--display); font-size:24px; font-weight:600; }
+  .flow-bars { display:grid; gap:4px; margin-top:8px; font-size:12px; color:var(--mut); }
+  .flow-bars div { display:grid; grid-template-columns:34px 1fr 74px; gap:8px; align-items:center; }
+  .flow-bars i { display:block; height:6px; border-radius:3px; }
+  .flow-bars em { font-style:normal; text-align:right; font-family:var(--display); color:var(--txt); }
+  .flow-read { font-size:13px; color:#C9D0F0; margin:10px 0 0; }
+  .chips { display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; padding-bottom:10px; scrollbar-width:none; }
+  .chips::-webkit-scrollbar { display:none; }
+  .chips button { flex:none; background:transparent; color:var(--mut); border:1px solid var(--line); border-radius:999px; padding:5px 12px;
+                  font:500 13px var(--body); cursor:pointer; }
+  .chips button.on { color:var(--ion); border-color:var(--ion); background:rgba(69,216,255,.1); }
+  .chips button span { opacity:.7; margin-left:4px; }
+  .news-list { list-style:none; margin:0; padding:0 6px 0 0; max-height:430px; overflow-y:auto; scroll-snap-type:y proximity;
+               scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+  .news-list li { display:grid; grid-template-columns:22px 1fr; gap:8px; padding:11px 0; border-bottom:1px solid rgba(42,53,112,.7); scroll-snap-align:start; }
+  .news-list .t { font-size:14px; line-height:1.2; padding-top:3px; text-align:center; color:var(--mut); }
+  .news-list .t.positive { color:var(--bull); } .news-list .t.negative { color:var(--bear); }
+  .news-list a { color:var(--txt); text-decoration:none; font-size:14.5px; line-height:1.45; }
+  .news-list a:hover { color:var(--ion); text-decoration:underline; }
+  .news-list .meta { font-size:12px; color:var(--mut); margin-top:3px; }
+  .news-list .topic { color:var(--violet); }
+
+  /* ---------- tabs ---------- */
+  .tabs { display:flex; gap:4px; margin:20px 0 16px; overflow-x:auto; border-bottom:1px solid var(--line); scrollbar-width:none; }
+  .tabs::-webkit-scrollbar { display:none; }
+  .tab { background:none; border:0; color:var(--mut); font:500 14px var(--body); padding:10px 16px; cursor:pointer; white-space:nowrap;
+         border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .tab:hover { color:var(--txt); }
+  .tab[aria-selected="true"] { color:var(--txt); border-bottom-color:var(--ion); text-shadow:0 0 12px rgba(69,216,255,.5); }
+  .panel[hidden] { display:none; }
+
+  /* ---------- panels ---------- */
+  .grid { display:grid; gap:16px; grid-template-columns:1fr; }
+  @media (min-width:1000px){ .grid.main { grid-template-columns:minmax(0,3fr) minmax(0,1.1fr); } }
+  .grid.two { grid-template-columns:1fr; }
+  @media (min-width:820px){ .grid.two { grid-template-columns:1fr 1fr; } }
+  .box { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:16px; min-width:0;
+         backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+  .box h2 { font-family:var(--display); font-weight:600; font-size:17px; letter-spacing:.02em; margin:0 0 12px; }
+  .box h3 { font-family:var(--display); font-weight:600; font-size:15px; margin:18px 0 8px; }
+  .stack { display:grid; gap:16px; align-content:start; }
+
   .controls { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
-  button, label.tog { background:#1f2430; color:var(--txt); border:1px solid var(--line); border-radius:8px;
-                      padding:6px 10px; font-size:13px; cursor:pointer; }
-  button.on { background:var(--acc); color:#000; border-color:var(--acc); }
-  label.tog input { margin-right:4px; }
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .seg button { background:transparent; color:var(--mut); border:0; border-right:1px solid var(--line); padding:6px 12px;
+                font:600 13px var(--display); cursor:pointer; letter-spacing:.03em; }
+  .seg button:last-child { border-right:0; }
+  .seg button.on { background:rgba(69,216,255,.16); color:var(--ion); }
+  label.tog { font-size:13px; color:var(--mut); padding:5px 10px 5px 6px; border:1px solid var(--line); border-radius:6px; cursor:pointer; user-select:none; }
+  label.tog input { accent-color:var(--ion); vertical-align:-2px; }
+  label.tog:has(input:checked) { color:var(--txt); border-color:var(--line-soft); }
   #chart { height:620px; } #oiChart, #vixChart, #cumChart { height:300px; }
-  .bias { font-size:22px; font-weight:700; padding:10px; border-radius:8px; text-align:center; margin-bottom:10px; }
-  .call { background:rgba(34,197,94,.15); color:var(--up); }
-  .put  { background:rgba(239,68,68,.15); color:var(--dn); }
-  .none { background:rgba(245,158,11,.12); color:var(--warn); }
+  @media (max-width:700px){ #chart { height:480px; } }
+
+  .signal { clip-path:var(--chamfer); padding:16px; background:var(--panel-solid); border:0; position:relative; }
+  .signal.call { background:linear-gradient(160deg, rgba(46,229,157,.22), var(--panel-solid) 55%); }
+  .signal.put  { background:linear-gradient(160deg, rgba(255,92,122,.22), var(--panel-solid) 55%); }
+  .signal.none { background:linear-gradient(160deg, rgba(255,181,71,.18), var(--panel-solid) 55%); }
+  .bias-name { font-family:var(--display); font-weight:700; font-size:26px; line-height:1.1; margin:2px 0 10px; }
+  .signal.call .bias-name { color:var(--bull); } .signal.put .bias-name { color:var(--bear); } .signal.none .bias-name { color:var(--amber); }
+  .meter { height:6px; border-radius:3px; background:linear-gradient(90deg,var(--bear),rgba(142,152,200,.35) 50%,var(--bull)); position:relative; margin:8px 0 14px; }
+  .meter span { position:absolute; top:-5px; width:4px; height:16px; background:#fff; border-radius:2px; box-shadow:0 0 10px #fff; }
+
   table { width:100%; border-collapse:collapse; font-size:14px; }
-  td, th { padding:6px 4px; border-bottom:1px solid var(--line); text-align:left; }
-  .kv td:last-child { text-align:right; font-variant-numeric:tabular-nums; }
-  ul { padding-left:18px; margin:6px 0; font-size:13px; line-height:1.6; }
-  .side { display:grid; gap:16px; align-content:start; }
-  .disc { font-size:12px; color:var(--mut); line-height:1.5; }
-  .meter { height:8px; border-radius:4px; background:linear-gradient(90deg,var(--dn),#444 50%,var(--up)); position:relative; margin:8px 0 4px; }
-  .meter span { position:absolute; top:-4px; width:4px; height:16px; background:#fff; border-radius:2px; }
-  .grid2 { display:grid; gap:16px; grid-template-columns:1fr; }
-  @media (min-width:800px){ .grid2 { grid-template-columns:1fr 1fr; } }
-  .tiles { display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); margin-bottom:12px; }
-  .tile { background:#1f2430; border-radius:10px; padding:10px; }
-  .tile b { display:block; font-size:20px; margin-top:2px; font-variant-numeric:tabular-nums; }
-  .warnbox { background:rgba(245,158,11,.12); color:var(--warn); padding:8px 10px; border-radius:8px; font-size:13px; margin-bottom:10px; }
-  .tablewrap { max-height:420px; overflow:auto; }
-  #trackTable th { position:sticky; top:0; background:var(--card); color:var(--mut); font-weight:500; font-size:12px; }
+  td, th { padding:7px 6px; border-bottom:1px solid rgba(42,53,112,.7); text-align:left; vertical-align:top; }
+  th { color:var(--mut); font-weight:500; font-size:12px; }
+  .kv td:last-child { text-align:right; font-family:var(--display); font-variant-numeric:tabular-nums; }
+  .kv td:first-child { color:var(--mut); }
+  ul.reasons { padding-left:18px; margin:10px 0 0; font-size:13px; line-height:1.65; color:#C9D0F0; }
+
+  .tiles { display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); margin-bottom:14px; }
+  .tile { border:1px solid var(--line); border-radius:6px; padding:10px 12px; background:rgba(14,20,51,.5); }
+  .tile span { font-size:12px; color:var(--mut); }
+  .tile b { display:block; font-family:var(--display); font-weight:600; font-size:21px; margin-top:2px; font-variant-numeric:tabular-nums; }
+  .note { border-left:3px solid var(--amber); background:rgba(255,181,71,.1); padding:9px 12px; border-radius:4px; font-size:13px; margin-bottom:12px; }
+
+  /* levels & tips */
+  .headline { font-family:var(--display); font-weight:600; font-size:clamp(20px,3vw,26px); line-height:1.3; margin:0 0 6px; max-width:60ch; }
+  .watch td { font-size:14px; }
+  .watch td.v { font-family:var(--display); font-weight:600; white-space:nowrap; }
+  .watch td.d { font-family:var(--display); white-space:nowrap; text-align:right; }
+  .watch td.why { color:#C9D0F0; font-size:13px; }
+  .watch tr.whyrow { display:none; }
+  @media (max-width:640px) {
+    .watch th:last-child, .watch td.why { display:none; }
+    .watch tr.whyrow { display:table-row; }
+    .watch tr.whyrow td { color:#C9D0F0; font-size:12.5px; padding-top:0; }
+    .watch tr:has(+ .whyrow) td { border-bottom:0; padding-bottom:2px; }
+  }
+  .watch tr.here td { background:rgba(69,216,255,.12); border-top:1px solid var(--ion); border-bottom:1px solid var(--ion); color:var(--ion); font-weight:600; }
+  .scen { display:grid; gap:10px; }
+  .sc { border:1px solid var(--line); border-left:4px solid var(--amber); border-radius:6px; padding:12px 14px; background:rgba(14,20,51,.5); }
+  .sc.call { border-left-color:var(--bull); } .sc.put { border-left-color:var(--bear); }
+  .sc .when { font-weight:600; margin-bottom:4px; }
+  .sc .tag { float:right; font:600 12px var(--display); letter-spacing:.04em; padding:1px 8px; border-radius:4px; margin-left:8px; }
+  .sc.call .tag { color:var(--bull); background:rgba(46,229,157,.12); } .sc.put .tag { color:var(--bear); background:rgba(255,92,122,.12); }
+  .sc.wait .tag { color:var(--amber); background:rgba(255,181,71,.12); }
+  .tips { display:grid; gap:16px; grid-template-columns:1fr; }
+  @media (min-width:820px){ .tips { grid-template-columns:repeat(3,1fr); } }
+  .tips ul { margin:0; padding-left:18px; font-size:14px; line-height:1.65; color:#C9D0F0; }
+  .tips li { margin-bottom:6px; }
+  dl.gloss { margin:0; display:grid; gap:10px; grid-template-columns:1fr; }
+  @media (min-width:820px){ dl.gloss { grid-template-columns:1fr 1fr; } }
+  dl.gloss dt { font-family:var(--display); font-weight:600; color:var(--ion); }
+  dl.gloss dd { margin:2px 0 0; font-size:14px; color:#C9D0F0; }
+
+  /* track */
+  .tablewrap { max-height:440px; overflow:auto; }
+  #trackTable th { position:sticky; top:0; background:var(--panel-solid); }
   #trackTable td { font-size:13px; white-space:nowrap; }
-  .pill { padding:2px 8px; border-radius:999px; font-size:12px; font-weight:600; }
-  .pos { color:var(--up); } .neg { color:var(--dn); }
+  .pill { padding:1px 8px; border-radius:4px; font:600 12px var(--display); letter-spacing:.03em; }
+  .pill.call { color:var(--bull); background:rgba(46,229,157,.12); } .pill.put { color:var(--bear); background:rgba(255,92,122,.12); }
+  .pill.none { color:var(--amber); background:rgba(255,181,71,.12); }
+
+  footer { max-width:1360px; margin:8px auto 30px; padding:0 18px; font-size:12px; color:var(--mut); line-height:1.6; }
+  @media (prefers-reduced-motion: reduce) { .dot { animation:none; } }
 </style>
 </head>
 <body>
-<header>
-  <div><h1 id="sym">NIFTY 50</h1><div class="mut" id="upd">Loading…</div></div>
-  <div class="chips"><span class="chip" id="vixChip">VIX –</span><span class="chip" id="pcrChip">PCR –</span></div>
-  <div><span class="price" id="px">–</span><span class="chg" id="chg"></span></div>
-</header>
 
-<main>
-  <!-- ===== Price chart ===== -->
-  <section class="card">
-    <div class="controls ranges">
-      <button data-d="22">1M</button><button data-d="66">3M</button>
-      <button data-d="132" class="on">6M</button><button data-d="252">1Y</button><button data-d="0">All</button>
+<div class="topbar"><div class="topbar-in">
+  <div class="brand">NIFTY<span>/</span>COCKPIT</div>
+  <div class="stamp" id="stamp" title="When this page's data was last refreshed">
+    <span class="dot" id="dot"></span>
+    <div><b id="updated">Loading…</b><span class="small mut" id="nextUpd"></span></div>
+  </div>
+  <button class="signout" id="signout">Sign out</button>
+</div></div>
+
+<div class="wrap">
+  <!-- ===== Hero: price and where it sits among the levels ===== -->
+  <section class="hero" aria-label="Nifty price and key levels">
+    <div class="hero-top">
+      <div>
+        <div class="sym" id="sym">NIFTY 50</div>
+        <div class="price" id="px">–</div>
+      </div>
+      <div class="chg" id="chg"></div>
+      <div class="readouts">
+        <div class="readout bias"><span>Next session</span><b id="hBias">–</b></div>
+        <div class="readout"><span>India VIX</span><b class="num" id="hVix">–</b></div>
+        <div class="readout"><span>Put-call ratio</span><b class="num" id="hPcr">–</b></div>
+      </div>
     </div>
-    <div class="controls">
-      <label class="tog"><input type="checkbox" data-t="sma20" checked>SMA 20</label>
-      <label class="tog"><input type="checkbox" data-t="sma50" checked>SMA 50</label>
-      <label class="tog"><input type="checkbox" data-t="sma200">SMA 200</label>
-      <label class="tog"><input type="checkbox" data-t="bb">Bollinger</label>
-      <label class="tog"><input type="checkbox" data-t="lv" checked>Pivot levels</label>
-      <label class="tog"><input type="checkbox" data-t="oi" checked>OI walls</label>
-      <label class="tog"><input type="checkbox" data-t="sig" checked>Past signals</label>
+    <div class="ladder" id="ladder" role="img" aria-label="Current price relative to support and resistance levels"></div>
+    <div class="ladder-legend">
+      <span><i style="background:var(--bull)"></i>Support</span>
+      <span><i style="background:var(--bear)"></i>Resistance</span>
+      <span><i style="background:var(--violet)"></i>Option-chain level</span>
+      <span><i style="background:var(--ion)"></i>Last close</span>
     </div>
-    <div id="chart"></div>
   </section>
 
-  <!-- ===== Side panels ===== -->
-  <div class="side">
-    <section class="card">
-      <h2>Next-session view</h2>
-      <div class="bias" id="bias">–</div>
-      <div class="mut">Signal strength (−6.5 bearish → +6.5 bullish): <b id="score"></b></div>
-      <div class="meter"><span id="needle"></span></div>
-      <table class="kv" id="plan"></table>
-      <ul id="reasons"></ul>
-    </section>
-    <section class="card">
-      <h2>Key levels</h2>
-      <table class="kv" id="levels"></table>
-      <div class="mut" style="margin-top:8px">Expected range (±1 ATR): <b id="rng"></b></div>
-      <div class="mut">VIX-implied 1-day move: <b id="vixMove">–</b></div>
-    </section>
-    <section class="card">
-      <h2>Rule backtest (2 yrs)</h2>
-      <table class="kv" id="bt"></table>
-      <div class="mut" style="margin-top:6px" id="base"></div>
-    </section>
-  </div>
+  <!-- ===== Market alerts ===== -->
+  <section class="alerts" aria-labelledby="alertsTitle">
+    <div class="alerts-head">
+      <h2 id="alertsTitle">Market alerts</h2>
+      <span class="small mut" id="alertsCount"></span>
+    </div>
+    <div class="alert-list" id="alertList"></div>
+    <button class="more" id="alertMore" hidden></button>
+  </section>
 
-  <!-- ===== Options & volatility ===== -->
-  <section class="card full">
-    <h2>Option chain &amp; volatility</h2>
-    <div id="ocWarn"></div>
-    <div class="tiles" id="ocTiles"></div>
-    <div class="grid2">
-      <div>
-        <div class="controls oiMode">
-          <button data-m="oi" class="on">Open interest</button><button data-m="chg">Change in OI</button>
-        </div>
-        <div id="oiChart"></div>
-        <div class="mut">Big call OI above price often acts as resistance; big put OI below acts as support.</div>
+  <!-- ===== News & money flows ===== -->
+  <section class="newsblock" aria-labelledby="newsTitle">
+    <div class="alerts-head">
+      <h2 id="newsTitle">News that could move the market</h2>
+      <span class="small mut" id="newsUpd"></span>
+    </div>
+    <div class="news-grid">
+      <div class="box flows" id="flows"></div>
+      <div class="box news">
+        <div class="chips" id="newsChips" role="group" aria-label="Filter news by topic"></div>
+        <ul class="news-list" id="newsList" tabindex="0" aria-label="Headlines, scrollable"></ul>
+        <p class="small mut" style="margin:10px 0 0">Headlines from Google News, Economic Times and Mint; tap one to read it at the source.
+          The ▲ ▼ tags are an automatic guess from the headline's wording about whether it's good or bad for Indian stocks, and can be wrong.</p>
       </div>
-      <div>
-        <div class="controls"><span class="mut" style="padding:6px 0">India VIX (follows the range buttons above)</span></div>
-        <div id="vixChart"></div>
-        <div class="mut">Above 20 = high fear and expensive premiums. Below 12 = calm, cheap premiums.</div>
+    </div>
+  </section>
+
+  <!-- ===== Tabs ===== -->
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" aria-selected="true" aria-controls="p-dash" id="t-dash">Dashboard</button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="p-tips" id="t-tips">Levels &amp; tips</button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="p-opt" id="t-opt">Options &amp; VIX</button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="p-track" id="t-track">Track record</button>
+  </nav>
+
+  <!-- ===== Dashboard ===== -->
+  <section class="panel" id="p-dash" role="tabpanel" aria-labelledby="t-dash">
+    <div class="grid main">
+      <div class="box">
+        <div class="controls">
+          <div class="seg ranges">
+            <button data-d="1d">1D</button><button data-d="5d">5D</button><button data-d="22">1M</button>
+            <button data-d="66">3M</button><button data-d="132" class="on">6M</button><button data-d="252">1Y</button><button data-d="0">All</button>
+          </div>
+        </div>
+        <div class="controls">
+          <label class="tog"><input type="checkbox" data-t="sma20" checked> SMA 20</label>
+          <label class="tog"><input type="checkbox" data-t="sma50" checked> SMA 50</label>
+          <label class="tog"><input type="checkbox" data-t="sma200"> SMA 200</label>
+          <label class="tog"><input type="checkbox" data-t="bb"> Bollinger</label>
+          <label class="tog"><input type="checkbox" data-t="lv" checked> Pivots</label>
+          <label class="tog"><input type="checkbox" data-t="oi" checked> OI walls</label>
+          <label class="tog"><input type="checkbox" data-t="sig" checked> Past signals</label>
+        </div>
+        <div class="small mut" id="chartNote" style="margin-bottom:4px"></div>
+        <div id="chart"></div>
+      </div>
+
+      <div class="stack">
+        <div class="signal" id="sigBox">
+          <div class="small mut">Plan for <span id="sessDate">the next session</span></div>
+          <div class="bias-name" id="bias">–</div>
+          <div class="small mut">Signal strength <b class="num" id="score" style="color:var(--txt)"></b> on a scale of −6.5 to +6.5</div>
+          <div class="meter"><span id="needle"></span></div>
+          <table class="kv" id="plan"></table>
+          <ul class="reasons" id="reasons"></ul>
+        </div>
+        <div class="box">
+          <h2>Expected move</h2>
+          <table class="kv">
+            <tr><td>Range from ATR</td><td id="rng">–</td></tr>
+            <tr><td>Move implied by VIX</td><td id="vixMove">–</td></tr>
+          </table>
+        </div>
+        <div class="box">
+          <h2>Rule backtest, 2 years</h2>
+          <table class="kv" id="bt"></table>
+          <p class="small mut" style="margin:8px 0 0" id="base"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Levels & tips ===== -->
+  <section class="panel" id="p-tips" role="tabpanel" aria-labelledby="t-tips" hidden>
+    <div class="grid main">
+      <div class="box">
+        <p class="small mut" style="margin:0 0 4px">For <span id="pbSession"></span></p>
+        <p class="headline" id="pbHead"></p>
+        <h3>Levels to watch, highest to lowest</h3>
+        <div style="overflow-x:auto"><table class="watch"><thead><tr><th>Level</th><th>Price</th><th style="text-align:right">Distance</th><th>Why it matters</th></tr></thead>
+        <tbody id="watch"></tbody></table></div>
+      </div>
+      <div class="stack">
+        <div class="box">
+          <h2>If this happens, do this</h2>
+          <div class="scen" id="scen"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box" style="margin-top:16px">
+      <h2>Ground rules for option buyers</h2>
+      <div class="tips">
+        <div><h3>Before the open</h3><ul>
+          <li>Write down your trigger, target and stop from the plan above before 9:15. Don't decide in the heat of the move.</li>
+          <li>Check the global cues: GIFT Nifty, US markets overnight, and any big news or results due.</li>
+          <li>Decide your size first. Risk no more than 1–2% of your capital on one trade.</li>
+        </ul></div>
+        <div><h3>During the session</h3><ul>
+          <li>Skip the first 15 minutes. Opening moves often reverse.</li>
+          <li>Wait for a 15-minute candle to close beyond a level. A quick poke through it often fails.</li>
+          <li>Use ATM or one strike in-the-money for direction trades. Cheap far-OTM options rarely pay off.</li>
+          <li>Set your stop on the Nifty level, not on the option price. Premiums swing too much to be a reliable stop.</li>
+        </ul></div>
+        <div><h3>Protecting capital</h3><ul>
+          <li>Never add to a losing option position. Time decay works against you every hour.</li>
+          <li>Book part of the profit at the first target and trail the rest.</li>
+          <li>On expiry day, avoid holding bought options after 1:30 PM unless the trade is well in profit.</li>
+          <li>After two losing trades in a day, stop for the day.</li>
+        </ul></div>
+      </div>
+      <h3 style="margin-top:22px">What the numbers mean</h3>
+      <dl class="gloss">
+        <div><dt>Pivot, R1, R2, S1, S2</dt><dd>Levels calculated from the last session's high, low and close. R means resistance above the price, S means support below it.</dd></div>
+        <div><dt>Open interest (OI)</dt><dd>The number of option contracts still open at a strike. Large OI shows where option sellers have placed their bets.</dd></div>
+        <div><dt>Put-call ratio (PCR)</dt><dd>Total put OI divided by total call OI. Above 1.3 usually means heavy put selling (supportive); below 0.7 means heavy call selling (bearish).</dd></div>
+        <div><dt>Max pain</dt><dd>The strike where option buyers as a whole would lose the most at expiry. Nifty often drifts toward it near expiry.</dd></div>
+        <div><dt>India VIX</dt><dd>The market's expected volatility over the next 30 days. Higher VIX means bigger expected moves and more expensive options.</dd></div>
+        <div><dt>ATR</dt><dd>Average true range: how many points Nifty has typically moved in a day recently.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- ===== Options & VIX ===== -->
+  <section class="panel" id="p-opt" role="tabpanel" aria-labelledby="t-opt" hidden>
+    <div class="box">
+      <h2>Option chain and volatility</h2>
+      <div id="ocWarn"></div>
+      <div class="tiles" id="ocTiles"></div>
+      <div class="grid two">
+        <div>
+          <div class="controls"><div class="seg oiMode"><button data-m="oi" class="on">Open interest</button><button data-m="chg">Change in OI</button></div></div>
+          <div id="oiChart"></div>
+          <p class="small mut">Large call OI above the price often acts as resistance. Large put OI below it often acts as support.</p>
+        </div>
+        <div>
+          <div class="controls"><span class="small mut" style="padding:6px 0">India VIX, following the chart range on the Dashboard tab</span></div>
+          <div id="vixChart"></div>
+          <p class="small mut">Above 20 means high fear and expensive premiums. Below 12 means a calm market and cheap premiums.</p>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- ===== Track record ===== -->
-  <section class="card full">
-    <h2>Signal track record</h2>
-    <div class="controls trackScope">
-      <button data-s="live" class="on">Live signals only</button><button data-s="all">Include backfilled</button>
-    </div>
-    <div class="tiles" id="trackTiles"></div>
-    <div class="grid2">
-      <div><div id="cumChart"></div></div>
-      <div>
-        <div class="controls trackFilter">
-          <button data-f="all" class="on">All</button><button data-f="CALL">Calls</button>
-          <button data-f="PUT">Puts</button><button data-f="NONE">No-trade</button>
+  <section class="panel" id="p-track" role="tabpanel" aria-labelledby="t-track" hidden>
+    <div class="box">
+      <h2>How past signals played out</h2>
+      <div class="controls"><div class="seg trackScope"><button data-s="live" class="on">Live signals only</button><button data-s="all">Include backfilled</button></div></div>
+      <div class="tiles" id="trackTiles"></div>
+      <div class="grid two">
+        <div id="cumChart"></div>
+        <div>
+          <div class="controls"><div class="seg trackFilter">
+            <button data-f="all" class="on">All</button><button data-f="CALL">Calls</button><button data-f="PUT">Puts</button><button data-f="NONE">No trade</button>
+          </div></div>
+          <div class="tablewrap"><table id="trackTable"></table></div>
         </div>
-        <div class="tablewrap"><table id="trackTable"></table></div>
       </div>
+      <p class="small mut">Each signal is graded as a one-day plan on the next session: entry at R1 for calls or S1 for puts, target R2 or S2,
+        and stop at the pivot. Points are Nifty index points, not option premium. Daily candles don't show which level was hit first,
+        so a day that touched both the stop and the target counts as a loss. Rows marked "bf" were backfilled on the first run using
+        price-based rules only.</p>
     </div>
-    <p class="mut">Each signal is graded as a 1-day plan on the next session: entry at R1 (calls) or S1 (puts), target R2/S2,
-      stop at the pivot. Points are <b>Nifty index points</b>, not option premium. Daily bars don't show which level was
-      hit first, so if both stop and target were touched it counts as a loss. "Backfilled" rows are past days graded
-      on the first run using technical rules only (no VIX/option-chain inputs).</p>
   </section>
+</div>
 
-  <section class="card full disc">
-    Educational tool only — not investment advice. Signals come from simple rules and are often wrong. Buying options can
-    lose 100% of the premium quickly. SEBI's study found the large majority of individual F&amp;O traders lose money.
-    Option-chain data is from NSE and may be missing or delayed. Consult a SEBI-registered adviser before trading.
-  </section>
-</main>
+<footer>
+  This is an educational tool, not investment advice. Signals come from simple rules and are often wrong. Buying options can lose the
+  whole premium quickly, and SEBI's study found most individual F&amp;O traders lose money. Option-chain data comes from NSE and can be
+  missing or delayed. Talk to a SEBI-registered adviser before trading.
+</footer>
 
 <script>
 let D, days = 132, oiMode = 'oi', scope = 'live', filt = 'all';
 const show = { sma20:true, sma50:true, sma200:false, bb:false, lv:true, oi:true, sig:true };
-const fmt = (n, d = 2) => n == null ? '–' : n.toLocaleString('en-IN', { maximumFractionDigits:d });
 const $ = id => document.getElementById(id);
-const AX = { gridcolor:'#262c38', zerolinecolor:'#262c38' };
-const BASE = { paper_bgcolor:'transparent', plot_bgcolor:'transparent', font:{ color:'#cbd5e1', size:11 } };
+const fmt = (n, d = 2) => n == null ? '–' : Number(n).toLocaleString('en-IN', { maximumFractionDigits:d });
+const C = { ion:'#45D8FF', bull:'#2EE59D', bear:'#FF5C7A', amber:'#FFB547', violet:'#A48BFF', mut:'#8E98C8', grid:'rgba(42,53,112,.8)' };
+const AX = { gridcolor:C.grid, zerolinecolor:C.grid, linecolor:C.grid };
+const BASE = { paper_bgcolor:'transparent', plot_bgcolor:'transparent', font:{ color:'#C9D0F0', size:11, family:'Sora, sans-serif' },
+               hoverlabel:{ bgcolor:'#171F4A', bordercolor:C.ion, font:{ family:'Chakra Petch, sans-serif' } } };
 const CFG = { responsive:true, displaylogo:false };
 const cls = b => b.startsWith('CALL') ? 'call' : b.startsWith('PUT') ? 'put' : 'none';
+const short = b => b.startsWith('CALL') ? 'Call bias' : b.startsWith('PUT') ? 'Put bias' : 'No trade';
 
-fetch('data.json?t=' + Date.now()).then(r => r.json()).then(d => { D = d; render(); drawAll(); })
-  .catch(() => $('upd').textContent = 'Could not load data.json – run analyze.py first');
+fetch('data.json?t=' + Date.now()).then(r => r.json()).then(d => { D = d; render(); drawPrice(); })
+  .catch(() => { $('updated').textContent = 'No data yet'; $('nextUpd').textContent = 'Run the "Update Nifty data" workflow in GitHub Actions'; });
 
-function render() {
-  const L = D.last, S = D.signal, V = D.vix, O = D.option_chain;
-  $('sym').textContent = D.symbol;
-  $('upd').textContent = `Data as of ${D.as_of} · updated ${D.updated}`;
-  $('px').textContent = fmt(L.close);
-  $('chg').textContent = `${L.change >= 0 ? '▲' : '▼'} ${fmt(L.change)} (${L.change_pct}%)`;
-  $('chg').style.color = L.change >= 0 ? 'var(--up)' : 'var(--dn)';
-  $('vixChip').textContent = V ? `India VIX ${V.value} (${V.change_pct > 0 ? '+' : ''}${V.change_pct}%)` : 'VIX n/a';
-  $('pcrChip').textContent = O ? `PCR ${O.pcr}${O.stale ? ' (old)' : ''}` : 'PCR n/a';
-
-  $('bias').textContent = S.bias; $('bias').className = 'bias ' + cls(S.bias);
-  $('score').textContent = S.score;
-  $('needle').style.left = `calc(${Math.min(100, Math.max(0, (S.score + 6.5) / 13 * 100))}% - 2px)`;
-  $('plan').innerHTML = Object.entries(S.plan).map(([k, v]) =>
-    `<tr><td class="mut">${k[0].toUpperCase() + k.slice(1)}</td><td>${v}</td></tr>`).join('');
-  $('reasons').innerHTML = S.reasons.map(r => `<li>${r}</li>`).join('');
-
-  $('levels').innerHTML = Object.entries(D.levels).map(([k, v]) => `<tr><td>${k}</td><td>${fmt(v, 1)}</td></tr>`).join('');
-  $('rng').textContent = `${fmt(D.expected_range[0], 0)} – ${fmt(D.expected_range[1], 0)}`;
-  $('vixMove').textContent = V ? `± ${fmt(V.day_move, 0)} pts` : 'n/a';
-
-  const b = D.backtest, row = (n, x) => `<tr><td>${n} (${x.signals})</td><td>1d ${x.hit_1d ?? '–'}% · 5d ${x.hit_5d ?? '–'}%</td></tr>`;
-  $('bt').innerHTML = row('Call signals', b.call) + row('Put signals', b.put);
-  $('base').textContent = `% of times the market moved the signal's way. Baseline: ${b.base_up_days_pct}% of days closed up. ${b.note}.`;
-
-  // option chain tiles
-  if (!O) {
-    $('ocWarn').innerHTML = `<div class="warnbox">Option-chain data couldn't be fetched from NSE yet. NSE often blocks cloud servers –
-      see the README for running the update from your own PC.</div>`;
-  } else {
-    if (O.stale) $('ocWarn').innerHTML = `<div class="warnbox">Today's NSE fetch failed – showing the last saved snapshot from ${O.fetched_at}.
-      It is not used in today's signal.</div>`;
-    const t = [['Expiry', O.expiry], ['PCR (OI)', O.pcr], ['PCR (change in OI)', O.pcr_chg_oi ?? '–'],
-               ['Max pain', fmt(O.max_pain, 0)], ['Call-OI wall', fmt(O.max_ce_oi_strike, 0)],
-               ['Put-OI wall', fmt(O.max_pe_oi_strike, 0)]];
-    if (V) t.push(['India VIX', V.value]);
-    $('ocTiles').innerHTML = t.map(([k, v]) => `<div class="tile"><span class="mut">${k}</span><b>${v}</b></div>`).join('');
-  }
-  renderTrack();
+/* ---------- update stamp ---------- */
+function nextRun(from) {          // next weekday 4:00 PM IST after `from` (NSE holidays not included)
+  const ist = new Date(from.getTime() + 330 * 60000);   // shift to IST wall-clock, read with UTC getters
+  const t = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), 16, 0));
+  if (ist >= t) t.setUTCDate(t.getUTCDate() + 1);
+  while ([0, 6].includes(t.getUTCDay())) t.setUTCDate(t.getUTCDate() + 1);
+  return new Date(t.getTime() - 330 * 60000);
+}
+function istLabel(d) {
+  return d.toLocaleString('en-IN', { timeZone:'Asia/Kolkata', weekday:'short', day:'numeric', month:'short', hour:'numeric', minute:'2-digit' });
+}
+function renderStamp() {
+  const up = new Date(D.updated_iso || Date.now());
+  const due = nextRun(up), now = new Date();
+  const ago = Math.round((now - up) / 3600000);
+  $('updated').textContent = `Last updated ${D.updated.replace(' IST', '')}`;
+  const late = now - due > 2 * 3600000;     // more than 2h past the scheduled run
+  $('dot').classList.toggle('late', late);
+  $('nextUpd').textContent = late
+    ? `Update overdue since ${istLabel(due)}. Check the Actions tab.`
+    : `Market data from ${new Date(D.as_of).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}. Next update ${istLabel(nextRun(now))}`;
+  $('stamp').title = `Updated ${ago < 1 ? 'less than an hour' : ago + ' hours'} ago`;
 }
 
-function drawAll() { drawPrice(); drawOI(); drawVix(); }
+/* ---------- hero ladder ---------- */
+function renderLadder() {
+  const close = D.last.close, lv = D.levels, oc = D.option_chain;
+  const pts = [['S2', lv.S2, 's'], ['S1', lv.S1, 's'], ['Pivot', lv.Pivot, ''], ['R1', lv.R1, 'r'], ['R2', lv.R2, 'r']];
+  if (oc && !oc.stale) pts.push(['Call wall', oc.max_ce_oi_strike, 'w'], ['Put wall', oc.max_pe_oi_strike, 'w'], ['Max pain', oc.max_pain, 'w']);
+  const near = pts.filter(p => Math.abs(p[1] / close - 1) < 0.025);
+  const vals = near.map(p => p[1]).concat(close);
+  const lo = Math.min(...vals), hi = Math.max(...vals), pad = (hi - lo) * 0.06 || 50;
+  const pos = v => ((v - lo + pad) / (hi - lo + 2 * pad) * 100).toFixed(2) + '%';
+  near.sort((a, b) => a[1] - b[1]);
+  const W = $('ladder').clientWidth || 800, GAP = 62, last = { up:-1e9, down:-1e9 };
+  $('ladder').innerHTML = '<div class="track"></div>' + near.map(p => {
+    const x = parseFloat(pos(p[1])) / 100 * W;
+    const side = x - last.up >= GAP ? 'up' : x - last.down >= GAP ? 'down' : null;
+    if (side) last[side] = x;
+    return `<div class="tick ${p[2]} ${side || ''}" style="left:${pos(p[1])}" title="${p[0]} ${fmt(p[1], 0)}">${side ? `<label>${p[0]}<b>${fmt(p[1], 0)}</b></label>` : ''}</div>`;
+  }).join('') +
+    `<div class="marker" style="left:${pos(close)}" title="Last close ${fmt(close)}"></div>`;
+}
 
-function drawPrice() {
-  const n = D.dates.length, s = days ? Math.max(0, n - days) : 0;
-  const cut = a => a.slice(s), x = cut(D.dates);
-  const line = (y, name, color, extra = {}) => ({ x, y: cut(y), name, type:'scatter', mode:'lines', line:{ width:1.4, color }, ...extra });
-  const t = [{ x, open:cut(D.open), high:cut(D.high), low:cut(D.low), close:cut(D.close), type:'candlestick', name:'Nifty',
-               increasing:{ line:{ color:'#22c55e' } }, decreasing:{ line:{ color:'#ef4444' } } }];
-  if (show.sma20) t.push(line(D.sma20, 'SMA 20', '#60a5fa'));
-  if (show.sma50) t.push(line(D.sma50, 'SMA 50', '#f59e0b'));
-  if (show.sma200) t.push(line(D.sma200, 'SMA 200', '#c084fc'));
-  if (show.bb) {
-    t.push(line(D.bb_up, 'BB upper', '#64748b', { line:{ dash:'dot', width:1 } }));
-    t.push(line(D.bb_lo, 'BB lower', '#64748b', { line:{ dash:'dot', width:1 }, fill:'tonexty', fillcolor:'rgba(100,116,139,.08)' }));
+/* ---------- alerts ---------- */
+let alertsOpen = false;
+function renderAlerts() {
+  const A = D.alerts || [];
+  if (!A.length) { $('alertList').innerHTML = '<p class="mut">Alerts appear after the next data update.</p>'; return; }
+  const highs = A.filter(a => a.severity === 'high').length;
+  $('alertsCount').textContent = `${A.length} for ${D.playbook ? D.playbook.session : 'the next session'}${highs ? `, ${highs} high priority` : ''}`;
+  const dir = k => /Breakout|up/i.test(k) && !/down/i.test(k) ? 'up' : /Breakdown/i.test(k) ? 'down' : '';
+  const shown = alertsOpen ? A : A.slice(0, 3);
+  $('alertList').innerHTML = shown.map(a => `<article class="alert ${a.severity}">
+      <div class="kind ${dir(a.kind)}">${a.kind}${a.severity === 'high' ? ', high priority' : ''}</div>
+      <h3>${a.title}</h3><p>${a.detail}</p>
+      ${a.levels.length ? `<div class="lv">${a.levels.map(v => `<span>${fmt(v, 0)}</span>`).join('')}</div>` : ''}
+    </article>`).join('');
+  $('alertMore').hidden = A.length <= 3;
+  $('alertMore').textContent = alertsOpen ? 'Show fewer alerts' : `Show all ${A.length} alerts`;
+}
+$('alertMore').onclick = () => { alertsOpen = !alertsOpen; renderAlerts(); };
+$('signout').onclick = () => { sessionStorage.removeItem('nc_auth'); localStorage.removeItem('nc_auth'); location.replace('login.html'); };
+
+/* ---------- news ---------- */
+let newsTopic = 'All';
+function ago(iso) {
+  const m = Math.round((Date.now() - new Date(iso)) / 60000);
+  return m < 60 ? `${Math.max(1, m)} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
+}
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+function renderNews() {
+  const N = D.news;
+  if (!N) { $('newsList').innerHTML = '<li><span></span><span class="mut">Headlines appear after the next data update.</span></li>'; $('flows').hidden = true; return; }
+  $('newsUpd').textContent = `Refreshed ${N.updated}`;
+
+  // FII / DII money flows
+  const F = N.fii_dii;
+  if (!F) {
+    $('flows').innerHTML = '<h2>Money flows</h2><p class="small mut">NSE didn\'t return FII/DII figures this time. They often block cloud servers; running the update from your own computer usually fixes it.</p>';
+  } else {
+    const max = Math.max(F.fii.buy, F.fii.sell, F.dii.buy, F.dii.sell);
+    const one = (name, x) => `<div class="flow"><div class="flow-top"><span>${name} net</span>
+        <b class="${x.net >= 0 ? 'pos' : 'neg'}">${x.net >= 0 ? '+' : '−'}₹${fmt(Math.abs(x.net), 0)} cr</b></div>
+        <div class="flow-bars">
+          <div>Buy<i style="width:${x.buy / max * 100}%;background:var(--bull)"></i><em>₹${fmt(x.buy, 0)}</em></div>
+          <div>Sell<i style="width:${x.sell / max * 100}%;background:var(--bear)"></i><em>₹${fmt(x.sell, 0)}</em></div>
+        </div></div>`;
+    const f = F.fii.net, d = F.dii.net;
+    const read = f < 0 && d > 0 ? (d >= -f ? 'Foreign funds sold, but domestic funds bought even more. Local buying is cushioning the market.'
+                                           : 'Foreign funds sold more than domestic funds bought. Net selling pressure on the market.')
+               : f > 0 && d < 0 ? 'Foreign funds are buying while domestic funds book profits. Foreign buying usually lifts large caps like Nifty stocks.'
+               : f > 0 && d > 0 ? 'Both foreign and domestic funds were buyers. A strong supportive sign.'
+               : 'Both foreign and domestic funds were sellers. A weak sign for the market.';
+    $('flows').innerHTML = `<h2>Money flows</h2><p class="small mut" style="margin:-6px 0 4px">Cash market, ${F.date || 'last session'}</p>
+      ${one('Foreign investors (FII/FPI)', F.fii)}${one('Domestic institutions (DII)', F.dii)}<p class="flow-read">${read}</p>`;
   }
-  if (show.sig) {
+
+  // headlines
+  const items = N.items || [];
+  const topics = ['All', ...new Set(items.map(i => i.topic))];
+  if (!topics.includes(newsTopic)) newsTopic = 'All';
+  $('newsChips').innerHTML = topics.map(t => `<button data-topic="${esc(t)}" class="${t === newsTopic ? 'on' : ''}">${esc(t)}<span>${t === 'All' ? items.length : items.filter(i => i.topic === t).length}</span></button>`).join('');
+  $('newsChips').querySelectorAll('button').forEach(b => b.onclick = () => { newsTopic = b.dataset.topic; renderNews(); });
+  const list = items.filter(i => newsTopic === 'All' || i.topic === newsTopic);
+  const mark = { positive:'▲', negative:'▼', neutral:'•' }, word = { positive:'Likely positive', negative:'Likely negative', neutral:'Neutral' };
+  $('newsList').innerHTML = list.length ? list.map(i => `<li>
+      <span class="t ${i.tone}" title="${word[i.tone]} for Indian stocks" aria-label="${word[i.tone]}">${mark[i.tone]}</span>
+      <div><a href="${esc(i.link)}" target="_blank" rel="noopener noreferrer">${esc(i.title)}</a>
+      <div class="meta">${esc(i.source)}${i.source ? ', ' : ''}${ago(i.time)} <span class="topic">${esc(i.topic)}</span></div></div></li>`).join('')
+    : '<li><span></span><span class="mut">No headlines came back in the last update. They\'ll be fetched again at the next run.</span></li>';
+  $('newsList').scrollTop = 0;
+}
+
+/* ---------- main render ---------- */
+function render() {
+  const L = D.last, S = D.signal, V = D.vix, O = D.option_chain, P = D.playbook;
+  renderStamp();
+  $('sym').textContent = D.symbol;
+  $('px').textContent = fmt(L.close);
+  $('chg').innerHTML = `<span class="${L.change >= 0 ? 'pos' : 'neg'}">${L.change >= 0 ? '▲' : '▼'} ${fmt(Math.abs(L.change))} (${L.change_pct >= 0 ? '+' : ''}${L.change_pct}%)</span>`;
+  $('hBias').textContent = short(S.bias); $('hBias').className = cls(S.bias);
+  $('hVix').innerHTML = V ? `${V.value} <span class="small ${V.change_pct > 0 ? 'neg' : 'pos'}">${V.change_pct > 0 ? '+' : ''}${V.change_pct}%</span>` : 'n/a';
+  $('hPcr').textContent = O ? O.pcr + (O.stale ? ' (old)' : '') : 'n/a';
+  renderLadder(); renderAlerts(); renderNews();
+  window.onresize = () => { clearTimeout(window._lr); window._lr = setTimeout(renderLadder, 150); };
+
+  $('sigBox').className = 'signal ' + cls(S.bias);
+  $('bias').textContent = S.bias;
+  if (P) $('sessDate').textContent = P.session;
+  $('score').textContent = S.score;
+  $('needle').style.left = `calc(${Math.min(100, Math.max(0, (S.score + 6.5) / 13 * 100))}% - 2px)`;
+  $('plan').innerHTML = Object.entries(S.plan).map(([k, v]) => `<tr><td>${k[0].toUpperCase() + k.slice(1)}</td><td style="font-family:var(--body);font-size:13px">${v}</td></tr>`).join('');
+  $('reasons').innerHTML = S.reasons.map(r => `<li>${r}</li>`).join('');
+  $('rng').textContent = `${fmt(D.expected_range[0], 0)} to ${fmt(D.expected_range[1], 0)}`;
+  $('vixMove').textContent = V ? `± ${fmt(V.day_move, 0)} pts` : 'n/a';
+
+  const b = D.backtest, row = (n, x) => `<tr><td>${n} (${x.signals})</td><td>1d ${x.hit_1d ?? '–'}%, 5d ${x.hit_5d ?? '–'}%</td></tr>`;
+  $('bt').innerHTML = row('Call signals', b.call) + row('Put signals', b.put);
+  $('base').textContent = `How often the market moved the way the signal said. For comparison, ${b.base_up_days_pct}% of all days closed higher. ${b.note}.`;
+
+  renderPlaybook(); renderOptions(); renderTrack();
+}
+
+function renderPlaybook() {
+  const P = D.playbook;
+  if (!P) { $('pbHead').textContent = 'The playbook appears after the next data update.'; return; }
+  $('pbSession').textContent = P.session;
+  $('pbHead').textContent = P.headline;
+  let placed = false, rows = '';
+  const here = `<tr class="here"><td>Last close</td><td class="v">${fmt(P.close, 1)}</td><td class="d">0</td><td>You are here</td></tr>`;
+  P.watch.forEach(w => {
+    if (!placed && w.value < P.close) { rows += here; placed = true; }
+    rows += `<tr><td>${w.name}</td><td class="v">${fmt(w.value, 1)}</td>
+      <td class="d ${w.dist >= 0 ? 'pos' : 'neg'}">${w.dist >= 0 ? '+' : '−'}${fmt(Math.abs(w.dist), 0)}<br><span class="small mut">${w.dist_pct >= 0 ? '+' : ''}${w.dist_pct}%</span></td>
+      <td class="why">${w.why}</td></tr><tr class="whyrow"><td colspan="3">${w.why}</td></tr>`;
+  });
+  if (!placed) rows += here;
+  $('watch').innerHTML = rows;
+  const tag = { call:'CE', put:'PE', wait:'Wait' };
+  $('scen').innerHTML = P.scenarios.map(s => `<div class="sc ${s.kind}"><span class="tag">${tag[s.kind]}</span>
+      <div class="when">${s.when}</div><div class="small" style="color:#C9D0F0">${s.then}</div></div>`).join('');
+}
+
+function renderOptions() {
+  const O = D.option_chain, V = D.vix;
+  if (!O) { $('ocWarn').innerHTML = `<div class="note">NSE didn't return option-chain data. NSE often blocks cloud servers, so run the update from your own computer (see the README).</div>`; return; }
+  if (O.stale) $('ocWarn').innerHTML = `<div class="note">Today's NSE request failed, so this is the last saved snapshot from ${O.fetched_at}. It isn't used in today's signal.</div>`;
+  const t = [['Expiry', O.expiry], ['PCR by OI', O.pcr], ['PCR by change in OI', O.pcr_chg_oi ?? '–'], ['Max pain', fmt(O.max_pain, 0)],
+             ['Call-OI wall', fmt(O.max_ce_oi_strike, 0)], ['Put-OI wall', fmt(O.max_pe_oi_strike, 0)]];
+  if (V) t.push(['India VIX', V.value]);
+  $('ocTiles').innerHTML = t.map(([k, v]) => `<div class="tile"><span>${k}</span><b>${v}</b></div>`).join('');
+}
+
+/* ---------- charts ---------- */
+function drawPrice() {
+  const intra = typeof days === 'string';
+  const src = intra ? (D.intraday || {})[days] : D;
+  if (!src) { $('chartNote').textContent = ''; $('chart').innerHTML = '<p class="mut" style="padding:40px;text-align:center">Intraday candles appear after the next data update.</p>'; return; }
+  $('chartNote').textContent = intra
+    ? `${src.interval === '5m' ? '5-minute' : '15-minute'} candles for ${src.from === src.to ? src.to : src.from + ' to ' + src.to}. This is the last completed session, not a live chart.`
+    : 'Daily candles';
+  const n = src.dates.length, s = !intra && days ? Math.max(0, n - days) : 0;
+  const cut = a => a.slice(s), x = cut(src.dates);
+  const line = (y, name, color, extra = {}) => ({ x, y: cut(y), name, type:'scatter', mode:'lines', line:{ width:1.5, color }, ...extra });
+  const t = [{ x, open:cut(src.open), high:cut(src.high), low:cut(src.low), close:cut(src.close), type:'candlestick', name:'Nifty',
+               increasing:{ line:{ color:C.bull }, fillcolor:'rgba(46,229,157,.55)' }, decreasing:{ line:{ color:C.bear }, fillcolor:'rgba(255,92,122,.55)' } }];
+  if (show.sma20) t.push(line(src.sma20, 'SMA 20', C.ion));
+  if (show.sma50) t.push(line(src.sma50, 'SMA 50', C.amber));
+  if (show.sma200) t.push(line(src.sma200, 'SMA 200', C.violet));
+  if (show.bb) {
+    t.push(line(src.bb_up, 'BB upper', C.mut, { line:{ dash:'dot', width:1, color:C.mut } }));
+    t.push(line(src.bb_lo, 'BB lower', C.mut, { line:{ dash:'dot', width:1, color:C.mut }, fill:'tonexty', fillcolor:'rgba(142,152,200,.07)' }));
+  }
+  if (show.sig && !intra) {
     const sc = cut(D.score), lo = cut(D.low), hi = cut(D.high);
     const pick = f => x.map((_, i) => i).filter(i => f(sc[i]) && (i === 0 || !f(sc[i - 1])));
     const ci = pick(v => v >= 2.5), pi = pick(v => v <= -2.5);
-    t.push({ x: ci.map(i => x[i]), y: ci.map(i => lo[i] * .995), mode:'markers', type:'scatter', name:'Call bias',
-             marker:{ symbol:'triangle-up', size:10, color:'#22c55e' } });
-    t.push({ x: pi.map(i => x[i]), y: pi.map(i => hi[i] * 1.005), mode:'markers', type:'scatter', name:'Put bias',
-             marker:{ symbol:'triangle-down', size:10, color:'#ef4444' } });
+    t.push({ x: ci.map(i => x[i]), y: ci.map(i => lo[i] * .995), mode:'markers', type:'scatter', name:'Call bias', marker:{ symbol:'triangle-up', size:10, color:C.bull } });
+    t.push({ x: pi.map(i => x[i]), y: pi.map(i => hi[i] * 1.005), mode:'markers', type:'scatter', name:'Put bias', marker:{ symbol:'triangle-down', size:10, color:C.bear } });
   }
-  t.push({ ...line(D.rsi, 'RSI', '#a78bfa'), yaxis:'y2' });
-  const hist = cut(D.macd_hist);
-  t.push({ x, y:hist, type:'bar', name:'MACD hist', yaxis:'y3', marker:{ color: hist.map(v => v >= 0 ? '#22c55e' : '#ef4444') } });
-  t.push({ ...line(D.macd, 'MACD', '#60a5fa'), yaxis:'y3' });
-  t.push({ ...line(D.macd_sig, 'Signal', '#f59e0b'), yaxis:'y3' });
+  t.push({ ...line(src.rsi, 'RSI', C.violet), yaxis:'y2' });
+  const hist = cut(src.macd_hist);
+  t.push({ x, y:hist, type:'bar', name:'MACD hist', yaxis:'y3', marker:{ color: hist.map(v => v >= 0 ? 'rgba(46,229,157,.7)' : 'rgba(255,92,122,.7)') } });
+  t.push({ ...line(src.macd, 'MACD', C.ion), yaxis:'y3' });
+  t.push({ ...line(src.macd_sig, 'Signal', C.amber), yaxis:'y3' });
 
-  const shapes = [70, 30].map(v => ({ type:'line', xref:'paper', x0:0, x1:1, yref:'y2', y0:v, y1:v, line:{ color:'#475569', dash:'dot', width:1 } }));
+  const shapes = [70, 30].map(v => ({ type:'line', xref:'paper', x0:0, x1:1, yref:'y2', y0:v, y1:v, line:{ color:C.mut, dash:'dot', width:1 } }));
   const ann = [];
   const hline = (v, label, c, dash) => {
     shapes.push({ type:'line', xref:'paper', x0:.8, x1:1, yref:'y', y0:v, y1:v, line:{ color:c, width:1, dash } });
     ann.push({ xref:'paper', x:1, y:v, yref:'y', text:`${label} ${Math.round(v)}`, showarrow:false, xanchor:'right', yanchor:'bottom', font:{ size:10, color:c } });
   };
-  if (show.lv) ['R2', 'R1', 'Pivot', 'S1', 'S2'].forEach(k =>
-    hline(D.levels[k], k, k[0] === 'R' ? '#ef4444' : k[0] === 'S' ? '#22c55e' : '#e5e7eb', 'dash'));
-  if (show.oi && D.option_chain) {
-    hline(D.option_chain.max_ce_oi_strike, 'Call wall', '#fb7185', 'dot');
-    hline(D.option_chain.max_pe_oi_strike, 'Put wall', '#4ade80', 'dot');
-  }
-  Plotly.react('chart', t, { ...BASE, margin:{ l:50, r:10, t:10, b:30 }, legend:{ orientation:'h', y:1.06 },
-    hovermode:'x unified', shapes, annotations:ann,
-    xaxis:{ ...AX, rangeslider:{ visible:false }, type:'category', nticks:8 },
-    yaxis:{ ...AX, domain:[.42, 1], title:'Price' }, yaxis2:{ ...AX, domain:[.22, .38], range:[0, 100], title:'RSI' },
-    yaxis3:{ ...AX, domain:[0, .18], title:'MACD' } }, CFG);
+  if (intra && src.prev_close) hline(src.prev_close, 'Prev close', C.mut, 'dot');
+  if (show.lv) ['R2', 'R1', 'Pivot', 'S1', 'S2'].forEach(k => hline(D.levels[k], k, k[0] === 'R' ? C.bear : k[0] === 'S' ? C.bull : '#E8ECFF', 'dash'));
+  if (show.oi && D.option_chain) { hline(D.option_chain.max_ce_oi_strike, 'Call wall', C.violet, 'dot'); hline(D.option_chain.max_pe_oi_strike, 'Put wall', C.violet, 'dot'); }
+  Plotly.react('chart', t, { ...BASE, margin:{ l:50, r:10, t:10, b:30 }, legend:{ orientation:'h', y:1.07 }, hovermode:'x unified', shapes, annotations:ann,
+    xaxis:{ ...AX, rangeslider:{ visible:false }, type:'category', nticks: intra ? 10 : 8 },
+    yaxis:{ ...AX, domain:[.42, 1] }, yaxis2:{ ...AX, domain:[.22, .38], range:[0, 100], title:{ text:'RSI', font:{ size:10 } } },
+    yaxis3:{ ...AX, domain:[0, .18], title:{ text:'MACD', font:{ size:10 } } } }, CFG);
 }
 
 function drawOI() {
   const O = D.option_chain;
-  if (!O) { $('oiChart').innerHTML = '<p class="mut">No option-chain data.</p>'; return; }
-  const ce = oiMode === 'oi' ? O.ce_oi : O.ce_chg, pe = oiMode === 'oi' ? O.pe_oi : O.pe_chg;
-  const x = O.strikes.map(String);
+  if (!O) { $('oiChart').innerHTML = '<p class="mut">No option-chain data yet.</p>'; return; }
+  const ce = oiMode === 'oi' ? O.ce_oi : O.ce_chg, pe = oiMode === 'oi' ? O.pe_oi : O.pe_chg, x = O.strikes.map(String);
+  const atm = String(Math.round(O.spot / 50) * 50);
   Plotly.react('oiChart', [
-    { x, y:ce, type:'bar', name:'Call (CE)', marker:{ color:'#ef4444' } },
-    { x, y:pe, type:'bar', name:'Put (PE)', marker:{ color:'#22c55e' } },
-  ], { ...BASE, barmode:'group', margin:{ l:55, r:10, t:10, b:40 }, legend:{ orientation:'h', y:1.12 },
-       hovermode:'x unified', xaxis:{ ...AX, type:'category', title:'Strike', nticks:12 }, yaxis:{ ...AX, title: oiMode === 'oi' ? 'Open interest' : 'Change in OI' },
-       shapes:[{ type:'line', x0:String(Math.round(O.spot / 50) * 50), x1:String(Math.round(O.spot / 50) * 50), yref:'paper', y0:0, y1:1, line:{ color:'#e5e7eb', dash:'dot' } }],
-       annotations:[{ x:String(Math.round(O.spot / 50) * 50), yref:'paper', y:1, text:`Spot ${fmt(O.spot, 0)}`, showarrow:false, yanchor:'bottom', font:{ size:10 } }] }, CFG);
+    { x, y:ce, type:'bar', name:'Calls (CE)', marker:{ color:'rgba(255,92,122,.8)' } },
+    { x, y:pe, type:'bar', name:'Puts (PE)', marker:{ color:'rgba(46,229,157,.8)' } },
+  ], { ...BASE, barmode:'group', margin:{ l:55, r:10, t:10, b:40 }, legend:{ orientation:'h', y:1.12 }, hovermode:'x unified',
+       xaxis:{ ...AX, type:'category', title:{ text:'Strike', font:{ size:10 } }, nticks:12 }, yaxis:{ ...AX },
+       shapes:[{ type:'line', x0:atm, x1:atm, yref:'paper', y0:0, y1:1, line:{ color:C.ion, dash:'dot' } }],
+       annotations:[{ x:atm, yref:'paper', y:1, text:`Spot ${fmt(O.spot, 0)}`, showarrow:false, yanchor:'bottom', font:{ size:10, color:C.ion } }] }, CFG);
 }
 
 function drawVix() {
-  if (!D.vix_series.length) { $('vixChart').innerHTML = '<p class="mut">No VIX data.</p>'; return; }
-  const n = D.dates.length, s = days ? Math.max(0, n - days) : 0;
+  if (!D.vix_series.length) { $('vixChart').innerHTML = '<p class="mut">No VIX data yet.</p>'; return; }
+  const vd = typeof days === 'string' ? 22 : days, n = D.dates.length, s = vd ? Math.max(0, n - vd) : 0;
   Plotly.react('vixChart', [{ x:D.dates.slice(s), y:D.vix_series.slice(s), type:'scatter', mode:'lines', name:'India VIX',
-      line:{ color:'#f59e0b', width:1.6 }, fill:'tozeroy', fillcolor:'rgba(245,158,11,.08)' }],
-    { ...BASE, margin:{ l:40, r:10, t:10, b:30 }, showlegend:false, hovermode:'x unified',
-      xaxis:{ ...AX, type:'category', nticks:6 }, yaxis:{ ...AX, title:'VIX' },
-      shapes:[20, 12].map(v => ({ type:'line', xref:'paper', x0:0, x1:1, y0:v, y1:v, line:{ color:'#475569', dash:'dot', width:1 } })) }, CFG);
+      line:{ color:C.amber, width:1.8 }, fill:'tozeroy', fillcolor:'rgba(255,181,71,.08)' }],
+    { ...BASE, margin:{ l:40, r:10, t:10, b:30 }, showlegend:false, hovermode:'x unified', xaxis:{ ...AX, type:'category', nticks:6 }, yaxis:{ ...AX },
+      shapes:[20, 12].map(v => ({ type:'line', xref:'paper', x0:0, x1:1, y0:v, y1:v, line:{ color:C.mut, dash:'dot', width:1 } })) }, CFG);
 }
 
 function renderTrack() {
-  const T = D.track, S = T.summary[scope];
-  const pct = v => v == null ? '–' : v + '%';
+  const T = D.track, S = T.summary[scope], pct = v => v == null ? '–' : v + '%';
   $('trackTiles').innerHTML = [
-    ['Trade signals', S.signals], ['Triggered', S.triggered], ['Win rate (triggered)', pct(S.win_rate)],
-    ['Direction correct', pct(S.direction_ok)],
+    ['Trade signals', S.signals], ['Triggered', S.triggered], ['Win rate when triggered', pct(S.win_rate)], ['Direction right', pct(S.direction_ok)],
     ['Net points', `<span class="${S.total_points >= 0 ? 'pos' : 'neg'}">${S.total_points >= 0 ? '+' : ''}${fmt(S.total_points, 1)}</span>`],
-    ['No-trade days in range', pct(S.no_trade_correct)],
-  ].map(([k, v]) => `<div class="tile"><span class="mut">${k}</span><b>${v}</b></div>`).join('');
-
+    ['No-trade days that stayed in range', pct(S.no_trade_correct)],
+  ].map(([k, v]) => `<div class="tile"><span>${k}</span><b>${v}</b></div>`).join('');
   let es = T.entries.filter(e => scope === 'all' || !e.backfilled);
-  // cumulative points chart (oldest → newest)
   const graded = es.filter(e => e.outcome && e.bias !== 'NONE').slice().reverse();
   let c = 0; const cum = graded.map(e => (c += e.outcome.points || 0));
-  if (graded.length) Plotly.react('cumChart', [{ x:graded.map(e => e.date), y:cum, type:'scatter', mode:'lines+markers',
-      line:{ color:'#60a5fa' }, marker:{ size:5, color:graded.map(e => e.outcome.points > 0 ? '#22c55e' : e.outcome.points < 0 ? '#ef4444' : '#64748b') } }],
-    { ...BASE, margin:{ l:50, r:10, t:30, b:40 }, showlegend:false, title:{ text:'Cumulative Nifty points', font:{ size:12 } },
+  if (graded.length && !$('p-track').hidden) Plotly.react('cumChart', [{ x:graded.map(e => e.date), y:cum, type:'scatter', mode:'lines+markers',
+      line:{ color:C.ion, width:2 }, marker:{ size:6, color:graded.map(e => e.outcome.points > 0 ? C.bull : e.outcome.points < 0 ? C.bear : C.mut) } }],
+    { ...BASE, margin:{ l:50, r:10, t:30, b:40 }, showlegend:false, title:{ text:'Running total of Nifty points', font:{ size:12 } },
       xaxis:{ ...AX, type:'category', nticks:6 }, yaxis:{ ...AX } }, CFG);
-  else $('cumChart').innerHTML = '<p class="mut">No graded trade signals yet — results appear the trading day after each signal.</p>';
-
+  else if (!graded.length) $('cumChart').innerHTML = '<p class="mut">No graded trade signals yet. Each signal is graded after the next trading day.</p>';
   if (filt !== 'all') es = es.filter(e => e.bias === filt);
-  const lbl = { CALL:'CALL', PUT:'PUT', NONE:'NO TRADE' };
+  const lbl = { CALL:'CALL', PUT:'PUT', NONE:'NO TRADE' }, cl = { CALL:'call', PUT:'put', NONE:'none' };
   $('trackTable').innerHTML = '<tr><th>Date</th><th>Signal</th><th>Close</th><th>Next close</th><th>Result</th><th>Pts</th></tr>' +
-    es.map(e => {
-      const o = e.outcome;
-      return `<tr><td>${e.date}${e.backfilled ? ' <span class="mut">·bf</span>' : ''}</td>
-        <td><span class="pill ${cls(e.bias)}">${lbl[e.bias]}</span></td>
-        <td>${fmt(e.close, 0)}</td>
-        <td>${o ? `${fmt(o.next_close, 0)} <span class="${o.move >= 0 ? 'pos' : 'neg'}">(${o.move >= 0 ? '+' : ''}${fmt(o.move, 0)})</span>` : '<span class="mut">pending</span>'}</td>
-        <td>${o ? o.result : '<span class="mut">next session</span>'}</td>
-        <td class="${o && o.points > 0 ? 'pos' : o && o.points < 0 ? 'neg' : ''}">${o && o.points != null ? fmt(o.points, 1) : '–'}</td></tr>`;
-    }).join('');
+    es.map(e => { const o = e.outcome; return `<tr><td>${e.date}${e.backfilled ? ' <span class="mut">bf</span>' : ''}</td>
+      <td><span class="pill ${cl[e.bias]}">${lbl[e.bias]}</span></td><td class="num">${fmt(e.close, 0)}</td>
+      <td class="num">${o ? `${fmt(o.next_close, 0)} <span class="${o.move >= 0 ? 'pos' : 'neg'}">(${o.move >= 0 ? '+' : ''}${fmt(o.move, 0)})</span>` : '<span class="mut">pending</span>'}</td>
+      <td>${o ? o.result : '<span class="mut">next session</span>'}</td>
+      <td class="num ${o && o.points > 0 ? 'pos' : o && o.points < 0 ? 'neg' : ''}">${o && o.points != null ? fmt(o.points, 1) : '–'}</td></tr>`; }).join('');
 }
 
+/* ---------- interactions ---------- */
+const tabs = [...document.querySelectorAll('.tab')];
+function openTab(tab) {
+  tabs.forEach(t => { const on = t === tab; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; $(t.getAttribute('aria-controls')).hidden = !on; });
+  if (!D) return;
+  const id = tab.id;               // charts in hidden tabs can't measure their size, so draw on open
+  if (id === 't-dash') drawPrice();
+  if (id === 't-opt') { drawOI(); drawVix(); }
+  if (id === 't-track') renderTrack();
+}
+tabs.forEach((t, i) => {
+  t.onclick = () => openTab(t);
+  t.onkeydown = e => { const k = { ArrowRight:1, ArrowLeft:-1 }[e.key]; if (k) { const n = tabs[(i + k + tabs.length) % tabs.length]; n.focus(); openTab(n); } };
+});
 const group = (sel, fn) => document.querySelectorAll(sel + ' button').forEach(b => b.onclick = () => {
   document.querySelectorAll(sel + ' button').forEach(x => x.classList.remove('on')); b.classList.add('on'); fn(b.dataset);
 });
-group('.ranges', d => { days = +d.d; drawPrice(); drawVix(); });
+group('.ranges', d => { days = /^\d+$/.test(d.d) ? +d.d : d.d; drawPrice(); });
 group('.oiMode', d => { oiMode = d.m; drawOI(); });
 group('.trackScope', d => { scope = d.s; renderTrack(); });
 group('.trackFilter', d => { filt = d.f; renderTrack(); });

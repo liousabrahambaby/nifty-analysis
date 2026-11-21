@@ -41,9 +41,9 @@ NSE_HEADERS = {
 # =====================================================================
 # Price data
 # =====================================================================
-def _yf(symbol, period="2y"):
+def _yf(symbol, period="2y", interval="1d"):
     import yfinance as yf
-    df = yf.download(symbol, period=period, interval="1d",
+    df = yf.download(symbol, period=period, interval=interval,
                      auto_adjust=False, progress=False)
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
@@ -71,6 +71,69 @@ def load_demo(n=500):
                        "Volume": rng.integers(2e5, 6e5, n)}, index=idx)
     vix = pd.Series(np.clip(14 + np.cumsum(rng.normal(0, 0.4, n)), 9, 35), index=idx)
     return df, vix
+
+
+# ---------- intraday (for the 1D / 5D chart views) ----------
+INTRADAY_VIEWS = {  # view: (candle size, how much to download, sessions to show)
+    "1d": ("5m", "5d", 1),
+    "5d": ("15m", "1mo", 5),
+}
+
+
+def load_intraday_live(interval, period):
+    df = _yf("^NSEI", period=period, interval=interval)
+    idx = df.index if df.index.tz is not None else df.index.tz_localize("UTC")
+    df.index = idx.tz_convert("Asia/Kolkata")
+    return df[["Open", "High", "Low", "Close"]].dropna()
+
+
+def load_intraday_demo(interval, last_close, sessions=22):
+    step = int(interval.rstrip("m"))
+    rng = np.random.default_rng(11)
+    days = pd.bdate_range(end=dt.date.today() - dt.timedelta(days=1), periods=sessions)
+    stamps = [pd.Timestamp(f"{d.date()} 09:15") + pd.Timedelta(minutes=step * i)
+              for d in days for i in range(375 // step + 1)]
+    close = np.exp(np.cumsum(rng.normal(0, 0.0012 * np.sqrt(step / 5), len(stamps))))
+    close = close / close[-1] * last_close
+    open_ = np.r_[close[0], close[:-1]]
+    spread = abs(rng.normal(0, 0.0006, len(stamps))) * close
+    return pd.DataFrame({"Open": open_, "High": np.maximum(open_, close) + spread,
+                         "Low": np.minimum(open_, close) - spread, "Close": close},
+                        index=pd.DatetimeIndex(stamps))
+
+
+def build_intraday(df, sessions):
+    """Indicators are computed on all downloaded bars (so they're warmed up),
+    then only the last `sessions` trading days are kept for the chart."""
+    df = add_indicators(df.copy())
+    days = sorted(set(df.index.date))
+    keep = set(days[-sessions:])
+    mask = np.array([d in keep for d in df.index.date])
+    sub, before = df[mask], df[~mask]
+    label = "%H:%M" if sessions == 1 else "%d %b %H:%M"
+
+    def col(name):
+        return [None if pd.isna(v) else round(float(v), 2) for v in sub[name]]
+
+    return {
+        "dates": [t.strftime(label) for t in sub.index],
+        **{k.lower(): col(k) for k in ["Open", "High", "Low", "Close", "SMA20", "SMA50", "SMA200",
+                                         "BB_UP", "BB_LO", "RSI", "MACD", "MACD_SIG", "MACD_HIST"]},
+        "prev_close": round(float(before["Close"].iloc[-1]), 2) if len(before) else None,
+        "from": min(keep).strftime("%d %b %Y"), "to": max(keep).strftime("%d %b %Y"),
+    }
+
+
+def get_intraday(demo, last_close):
+    out = {}
+    for view, (interval, period, sessions) in INTRADAY_VIEWS.items():
+        try:
+            raw = (load_intraday_demo(interval, last_close) if demo
+                   else load_intraday_live(interval, period))
+            out[view] = build_intraday(raw, sessions) | {"interval": interval}
+        except Exception as e:  # never let intraday problems break the daily update
+            print(f"Intraday {view} failed:", e)
+    return out
 
 
 # =====================================================================
@@ -170,6 +233,162 @@ def get_chain(demo, spot, as_of):
             oc["stale"] = True
             return oc
         return None
+
+
+# =====================================================================
+# News and FII / DII flows
+# =====================================================================
+# Only headlines, source names, times and links are kept (no article text).
+GN = "https://news.google.com/rss/search?hl=en-IN&gl=IN&ceid=IN:en&q="
+NEWS_FEEDS = [
+    GN + "Nifty+Sensex+stock+market+when:2d",
+    GN + "FII+OR+FPI+OR+DII+India+stocks+when:2d",
+    GN + "global+markets+Fed+OR+crude+OR+dollar+India+when:2d",
+    GN + "geopolitical+tensions+OR+war+OR+tariffs+markets+when:2d",
+    GN + "RBI+OR+rupee+OR+inflation+India+economy+when:2d",
+    "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
+    "https://www.livemint.com/rss/markets",
+]
+NEWS_TOPICS = [  # first match wins
+    ("FII / DII", ["fii", "fpi", "dii", "foreign investor", "foreign portfolio", "foreign fund", "institutional investor", "outflow", "inflow"]),
+    ("Global", ["fed", "powell", "wall street", "us market", "dow", "nasdaq", "s&p 500", "china", "trump", "tariff", "war", "israel",
+                "iran", "russia", "ukraine", "geopolit", "tension", "global", "treasury", "dollar index", "recession", "opec"]),
+    ("Policy", ["rbi", "repo", "rate cut", "rate hike", "inflation", "cpi", "gdp", "budget", "sebi", "government", "fiscal", "tax"]),
+    ("Commodities", ["crude", "oil", "brent", "gold", "silver", "commodit"]),
+    ("Currency", ["rupee", "forex", "inr", "usd/inr"]),
+    ("Earnings", ["q1", "q2", "q3", "q4", "results", "earnings", "profit", "revenue", "guidance"]),
+]
+# Words are matched as word starts, so "rall" also matches "rally" and "rallies".
+UP_WORDS = ["rall", "surg", "jump", "soar", "gain", "rise", "rising", "higher", "climb", "record high", "rebound", "recover"]
+DOWN_WORDS = ["fall", "fell", "slump", "crash", "plunge", "tumbl", "drop", "slide", "slid", "lower", "decline", "sink", "record low", "weaken"]
+GOOD = ["inflow", "net buyer", "buying", "upgrade", "rate cut", "ease", "eases", "easing", "beat", "strong", "boost", "ceasefire",
+        "deal", "optimis", "bull", "outperform"]
+BAD = ["outflow", "net seller", "selling", "selloff", "sell-off", "downgrade", "rate hike", "tension", "war", "attack", "fear",
+       "weak", "miss", "bear", "recession", "tariff", "sanction", "worr", "concern", "drag", "volatil", "uncertain"]
+# For these, a rise is bad for Indian stocks (India imports most of its oil; a strong dollar pulls money out)
+RISE_IS_BAD = ["crude", "oil", "brent", "dollar index", "us yield", "treasury yield", "bond yield", "vix", "inflation"]
+
+
+def _tone(t):
+    """Rough guess of whether a headline is good or bad for Indian stocks."""
+    import re
+    w = t.lower()
+    has = lambda words: sum(bool(re.search(r"\b" + re.escape(k), w)) for k in words)
+    up, down = has(UP_WORDS), has(DOWN_WORDS)
+    if any(k in w for k in RISE_IS_BAD) and not any(k in w for k in ["nifty", "sensex", "stocks"]):
+        up, down = down, up
+    score = up - down + has(GOOD) - has(BAD)
+    return "positive" if score > 0 else "negative" if score < 0 else "neutral"
+
+
+def fetch_news(limit=45, max_age_h=48):
+    import re
+    import requests
+    import xml.etree.ElementTree as ET
+    from email.utils import parsedate_to_datetime
+    now = dt.datetime.now(dt.timezone.utc)
+    seen, items = set(), []
+    for url in NEWS_FEEDS:
+        try:
+            r = requests.get(url, timeout=20, headers={"User-Agent": NSE_HEADERS["User-Agent"]})
+            root = ET.fromstring(r.content)
+        except Exception as e:
+            print("News feed failed:", url[:70], e)
+            continue
+        for it in root.iter("item"):
+            title = (it.findtext("title") or "").strip()
+            link = (it.findtext("link") or "").strip()
+            src_el = it.find("source")
+            source = src_el.text.strip() if src_el is not None and src_el.text else ""
+            if not source:
+                source = "Economic Times" if "economictimes" in url else "Mint" if "livemint" in url else ""
+            if source and title.endswith(" - " + source):
+                title = title[: -len(source) - 3].strip()
+            try:
+                when = parsedate_to_datetime(it.findtext("pubDate"))
+                when = when if when.tzinfo else when.replace(tzinfo=dt.timezone.utc)
+            except Exception:
+                continue
+            if not title or not link.startswith("http") or (now - when).total_seconds() > max_age_h * 3600:
+                continue
+            key = re.sub(r"[^a-z0-9]", "", title.lower())[:70]
+            if key in seen:
+                continue
+            seen.add(key)
+            low = title.lower()
+            topic = next((name for name, kws in NEWS_TOPICS if any(k in low for k in kws)), "Markets")
+            items.append({"title": title, "source": source, "link": link, "topic": topic, "tone": _tone(title),
+                          "time": when.astimezone(IST).isoformat(timespec="minutes")})
+    items.sort(key=lambda x: x["time"], reverse=True)
+    return items[:limit]
+
+
+def fetch_fii_dii():
+    """Latest FII/FPI and DII cash-market activity (Rs crore) from NSE."""
+    import requests
+    s = requests.Session()
+    s.headers.update(NSE_HEADERS | {"Referer": "https://www.nseindia.com/reports/fii-dii"})
+    s.get(NSE + "/reports/fii-dii", timeout=20)
+    rows = s.get(NSE + "/api/fiidiiTradeReact", timeout=20).json()
+    num = lambda v: round(float(str(v).replace(",", "")), 2)
+    out = {}
+    for r in rows:
+        cat = str(r.get("category", "")).upper()
+        key = "fii" if "FII" in cat or "FPI" in cat else "dii" if "DII" in cat else None
+        if key:
+            out[key] = {"buy": num(r["buyValue"]), "sell": num(r["sellValue"]), "net": num(r["netValue"])}
+            out["date"] = r.get("date")
+    if "fii" not in out:
+        raise ValueError("No FII row in NSE response")
+    return out
+
+
+def demo_news():
+    now = dt.datetime.now(IST)
+    rows = [
+        ("FIIs net sellers for third straight session as global risk appetite weakens", "FII / DII"),
+        ("DIIs absorb foreign selling with strong buying in banking stocks", "FII / DII"),
+        ("US Fed signals patience on rate cuts; Asian markets trade mixed", "Global"),
+        ("Crude oil prices jump on Middle East supply concerns", "Commodities"),
+        ("Rupee slides to record low against the dollar", "Currency"),
+        ("RBI keeps repo rate unchanged, retains neutral stance", "Policy"),
+        ("Nifty ends lower as IT and metal stocks drag; midcaps outperform", "Markets"),
+        ("Trade talks progress eases tariff worries, boosts global equities", "Global"),
+        ("Banking major beats Q2 estimates on strong loan growth", "Earnings"),
+    ]
+    return [{"title": t, "source": "Demo source", "link": "https://example.com", "topic": tp, "tone": _tone(t),
+             "time": (now - dt.timedelta(hours=2 * i + 1)).isoformat(timespec="minutes")} for i, (t, tp) in enumerate(rows)]
+
+
+def get_news(demo):
+    if demo:
+        return {"items": demo_news(), "fii_dii": {"date": "20-Nov-2026", "fii": {"buy": 11234.5, "sell": 13890.2, "net": -2655.7},
+                                                     "dii": {"buy": 14520.8, "sell": 11102.4, "net": 3418.4}},
+                "updated": dt.datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")}
+    try:
+        items = fetch_news()
+    except Exception as e:
+        print("News failed:", e)
+        items = []
+    try:
+        flows = fetch_fii_dii()
+    except Exception as e:
+        print("FII/DII fetch failed:", e)
+        flows = None
+    return {"items": items, "fii_dii": flows, "updated": dt.datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")}
+
+
+def news_only(demo):
+    """Refresh just the news section of an existing data.json (used by the morning run)."""
+    with open("data.json") as f:
+        data = json.load(f)
+    fresh = get_news(demo)
+    if not fresh["fii_dii"] and data.get("news", {}).get("fii_dii"):
+        fresh["fii_dii"] = data["news"]["fii_dii"]  # keep yesterday's figures rather than none
+    data["news"] = fresh
+    with open("data.json", "w") as f:
+        json.dump(data, f)
+    print(f"News refreshed: {len(fresh['items'])} headlines")
 
 
 # =====================================================================
@@ -395,10 +614,212 @@ def update_track(df, vix_s, today_entry):
 
 
 # =====================================================================
+# Playbook: levels to watch and what to do at each
+# =====================================================================
+def next_session(as_of):
+    d = as_of + dt.timedelta(days=1)
+    while d.weekday() >= 5:
+        d += dt.timedelta(days=1)
+    return d  # NSE holidays are not accounted for
+
+
+def build_playbook(last, lv, oc, vix, bias):
+    close = float(last.Close)
+    pts = lambda v: f"{v:,.0f}"
+    watch = [
+        ("R2", lv["R2"], "Call target and strong resistance. Book profits on calls here."),
+        ("R1", lv["R1"], "Call trigger. A 15-minute close above this starts the CE plan."
+                         if bias == "CALL" else "First resistance. Rallies often stall here."),
+        ("Pivot", lv["Pivot"], "Stop-loss line for both plans. Above it buyers control the day, below it sellers do."),
+        ("S1", lv["S1"], "Put trigger. A 15-minute close below this starts the PE plan."
+                         if bias == "PUT" else "First support. Dips often find buyers here."),
+        ("S2", lv["S2"], "Put target and strong support. Book profits on puts here."),
+        ("Last session high", float(last.High), "A break above often brings follow-through buying."),
+        ("Last session low", float(last.Low), "A break below often brings follow-through selling."),
+    ]
+    for name, col, why in [("20-day average", "SMA20", "Short-term trend line."),
+                           ("50-day average", "SMA50", "Medium-term trend line. Closing above or below it shifts the bias."),
+                           ("200-day average", "SMA200", "Long-term trend line that large funds watch.")]:
+        if not pd.isna(last[col]):
+            watch.append((name, float(last[col]), why))
+    if oc and not oc.get("stale"):
+        watch += [
+            ("Call-OI wall", oc["max_ce_oi_strike"], "Most call writers sit here. It tends to cap rallies; a clean break can trigger a fast short-covering move."),
+            ("Put-OI wall", oc["max_pe_oi_strike"], "Most put writers sit here. It tends to hold dips; a break can speed up a fall."),
+            ("Max pain", oc["max_pain"], f"Where option buyers lose the most at expiry ({oc['expiry']}). Nifty often drifts toward it close to expiry."),
+        ]
+    watch = sorted(({"name": n, "value": round(float(v), 1), "dist": round(float(v) - close, 1),
+                     "dist_pct": round((float(v) / close - 1) * 100, 2), "why": w} for n, v, w in watch),
+                   key=lambda x: -x["value"])
+
+    gap = close * 0.005
+    sc = [
+        {"kind": "call", "when": f"Nifty closes a 15-minute candle above R1 {pts(lv['R1'])}",
+         "then": f"Buy an ATM call. Target R2 {pts(lv['R2'])}, exit if Nifty falls back below the pivot {pts(lv['Pivot'])}."
+                 + ("" if bias == "CALL" else " This goes against today's bias, so trade smaller or skip it.")},
+        {"kind": "put", "when": f"Nifty closes a 15-minute candle below S1 {pts(lv['S1'])}",
+         "then": f"Buy an ATM put. Target S2 {pts(lv['S2'])}, exit if Nifty climbs back above the pivot {pts(lv['Pivot'])}."
+                 + ("" if bias == "PUT" else " This goes against today's bias, so trade smaller or skip it.")},
+        {"kind": "wait", "when": f"Nifty stays between S1 {pts(lv['S1'])} and R1 {pts(lv['R1'])}",
+         "then": "Don't buy options. Premiums lose value every hour in a sideways market."},
+        {"kind": "wait", "when": f"Nifty opens more than {pts(gap)} points (0.5%) away from {pts(close)}",
+         "then": "Wait 15 to 30 minutes. Big gaps often partly fill. Enter only if price holds beyond the first 15-minute high (gap up) or low (gap down)."},
+    ]
+    if oc and not oc.get("stale"):
+        for name, k in [("call-OI wall", oc["max_ce_oi_strike"]), ("put-OI wall", oc["max_pe_oi_strike"])]:
+            if abs(k - close) / close < 0.005:
+                sc.append({"kind": "wait", "when": f"Price is within 0.5% of the {name} {pts(k)}",
+                           "then": "Expect a fight at this level. Wait for a clear 15-minute close through it before trading the breakout."})
+        try:
+            exp = dt.datetime.strptime(oc["expiry"], "%d-%b-%Y").date()
+            if exp == next_session(as_of=pd.Timestamp(last.name).date()):
+                sc.append({"kind": "wait", "when": "Next session is expiry day",
+                           "then": "Premiums decay very fast after noon. Avoid holding bought options into the last two hours."})
+        except Exception:
+            pass
+    if vix is not None and vix >= 20:
+        sc.append({"kind": "wait", "when": f"India VIX is high at {vix:.1f}",
+                   "then": "Premiums are expensive. Use smaller size or spreads instead of plain option buying."})
+
+    line = {"CALL": f"Leaning bullish. Watch R1 {pts(lv['R1'])}: the call plan starts above it.",
+            "PUT": f"Leaning bearish. Watch S1 {pts(lv['S1'])}: the put plan starts below it.",
+            "NONE": f"No clear edge. Stay flat unless Nifty breaks R1 {pts(lv['R1'])} or S1 {pts(lv['S1'])}."}[bias]
+    return {"headline": line, "pivot": round(float(lv["Pivot"]), 1), "close": round(close, 1),
+            "session": next_session(pd.Timestamp(last.name).date()).strftime("%a %d %b %Y"),
+            "watch": watch, "scenarios": sc}
+
+
+# =====================================================================
+# Market alerts: breakouts, crossovers, gaps and other notable events
+# =====================================================================
+def build_alerts(df, oc, vix, vix_prev, bias, lv):
+    A = []
+    r, p = df.iloc[-1], df.iloc[-2]
+    c = float(r.Close)
+    f = lambda v: f"{v:,.0f}"
+
+    def add(sev, kind, title, detail, levels=()):
+        A.append({"severity": sev, "kind": kind, "title": title, "detail": detail,
+                  "levels": [round(float(x), 0) for x in levels]})
+
+    lean = {"CALL": " The trend signals currently favour an upside break.",
+            "PUT": " The trend signals currently favour a downside break.",
+            "NONE": " The trend signals don't favour either side yet."}[bias]
+
+    # 1. Tight range / volatility squeeze -> breakout expected
+    win = df.iloc[-10:]
+    hi10, lo10 = float(win.High.max()), float(win.Low.min())
+    rng_pct = (hi10 - lo10) / c * 100
+    bbw = ((df.BB_UP - df.BB_LO) / df.SMA20).dropna()
+    squeeze = (bbw.iloc[-126:] < bbw.iloc[-1]).mean() if len(bbw) > 20 else 1
+    still_inside = float(df.Low.iloc[-10:-1].min()) <= c <= float(df.High.iloc[-10:-1].max())
+    if (squeeze <= 0.15 or rng_pct < 2.5) and still_inside:
+        add("high", "Breakout watch", f"Breakout expected: Nifty is stuck between {f(lo10)} and {f(hi10)}",
+            f"The last 10 sessions moved within just {rng_pct:.1f}%, and Bollinger Bands are narrower than on "
+            f"{100 - squeeze * 100:.0f}% of days in the last 6 months. Tight ranges usually end in a sharp move. "
+            f"A daily close above {f(hi10)} signals an upside breakout; a close below {f(lo10)} signals a breakdown." + lean,
+            (lo10, hi10))
+
+    # 2. 20-day and 52-week highs / lows
+    h20, l20 = float(df.High.iloc[-21:-1].max()), float(df.Low.iloc[-21:-1].min())
+    if r.High > h20:
+        add("high", "Breakout", f"Broke above the 20-day high of {f(h20)}",
+            f"Holding above {f(h20)} keeps the breakout alive, with R2 {f(lv['R2'])} next. "
+            f"Falling back below it would make this a false breakout.", (h20,))
+    elif c >= h20 * 0.995:
+        add("medium", "Breakout watch", f"Testing the 20-day high of {f(h20)}",
+            f"Nifty closed {f(h20 - c)} points below it. A close above {f(h20)} could open a breakout move.", (h20,))
+    if r.Low < l20:
+        add("high", "Breakdown", f"Broke below the 20-day low of {f(l20)}",
+            f"Staying below {f(l20)} keeps sellers in control, with S2 {f(lv['S2'])} next. "
+            f"A quick recovery above it would make this a false breakdown.", (l20,))
+    elif c <= l20 * 1.005:
+        add("medium", "Breakdown watch", f"Testing the 20-day low of {f(l20)}",
+            f"Nifty closed {f(c - l20)} points above it. A close below {f(l20)} could start a breakdown.", (l20,))
+    if len(df) > 253:
+        h52, l52 = float(df.High.iloc[-253:-1].max()), float(df.Low.iloc[-253:-1].min())
+        if r.High > h52:
+            add("high", "Breakout", f"New 52-week high above {f(h52)}", "A strong sign of momentum. Pullbacks toward the old high often find buyers.", (h52,))
+        elif c >= h52 * 0.98:
+            add("medium", "Breakout watch", f"Within 2% of the 52-week high of {f(h52)}", f"A move above {f(h52)} would be a major breakout.", (h52,))
+        if r.Low < l52:
+            add("high", "Breakdown", f"New 52-week low below {f(l52)}", "A sign of strong selling pressure. Avoid buying calls against this trend.", (l52,))
+
+    # 3. Crossovers in the last 3 sessions
+    def cross(a, b, n=3):
+        sgn = np.sign((df[a] - df[b]).iloc[-n - 1:]).dropna()
+        if len(sgn) < 2 or (sgn == sgn.iloc[-1]).all():
+            return 0
+        return int(sgn.iloc[-1])
+    if not pd.isna(r.SMA200):
+        x = cross("SMA50", "SMA200")
+        if x:
+            add("high", "Trend change", "Golden cross: 50-day average crossed above the 200-day" if x > 0
+                else "Death cross: 50-day average crossed below the 200-day",
+                "A long-term trend signal that many funds follow. It often marks a shift that lasts weeks or months.",
+                (r.SMA200,))
+    x = cross("SMA20", "SMA50")
+    if x:
+        add("medium", "Trend change", f"20-day average crossed {'above' if x > 0 else 'below'} the 50-day",
+            f"Short-term momentum has turned {'up' if x > 0 else 'down'}.", (r.SMA50,))
+    x = cross("MACD", "MACD_SIG", 1)
+    if x:
+        add("medium", "Momentum", f"MACD crossed {'above' if x > 0 else 'below'} its signal line today",
+            f"An early sign that momentum is turning {'bullish' if x > 0 else 'bearish'}.")
+    if p.RSI <= 70 < r.RSI:
+        add("medium", "Momentum", f"RSI moved into overbought territory ({r.RSI:.0f})", "The rally is stretched. Expect pullbacks or sideways moves before the next leg up.")
+    if p.RSI >= 30 > r.RSI:
+        add("medium", "Momentum", f"RSI moved into oversold territory ({r.RSI:.0f})", "The fall is stretched. Sharp relief bounces are common from here.")
+
+    # 4. Gaps, big moves and inside days
+    gap = float(r.Open - p.Close)
+    if abs(gap) / p.Close > 0.005:
+        filled = (r.Low <= p.Close) if gap > 0 else (r.High >= p.Close)
+        add("info", "Gap", f"Gap {'up' if gap > 0 else 'down'} of {f(abs(gap))} points at the open",
+            f"The gap zone is {f(min(p.Close, r.Open))} to {f(max(p.Close, r.Open))}. "
+            + ("It has already been filled." if filled else f"It is still open, so {f(p.Close)} may act as a magnet or as {'support' if gap > 0 else 'resistance'}."),
+            (p.Close,))
+    move = c - float(p.Close)
+    if abs(move) > 1.5 * float(p.ATR):
+        add("high", "Big move", f"Unusually large move of {'+' if move > 0 else '−'}{f(abs(move))} points",
+            f"That's {abs(move) / p.ATR:.1f} times the normal daily range. Big days are often followed by more volatility, so expect wider swings.")
+    if r.High < p.High and r.Low > p.Low:
+        add("medium", "Breakout watch", f"Inside day: the next breakout level is {f(p.High)} or {f(p.Low)}",
+            f"Today's range sat inside yesterday's, which shows indecision. A move beyond {f(p.High)} or {f(p.Low)} often sets the next direction.",
+            (p.Low, p.High))
+
+    # 5. Volatility
+    if vix is not None and vix_prev:
+        ch = (vix / vix_prev - 1) * 100
+        if ch >= 10:
+            add("high", "Volatility", f"India VIX spiked {ch:.0f}% to {vix:.1f}", "Fear is rising fast. Option premiums jump with VIX, so bought options cost more and swings get bigger.")
+        elif ch <= -10:
+            add("medium", "Volatility", f"India VIX dropped {abs(ch):.0f}% to {vix:.1f}", "Fear is easing. Premiums are shrinking, which hurts option buyers who hold overnight.")
+
+    # 6. Option-chain walls nearby
+    if oc and not oc.get("stale"):
+        cw, pw = oc["max_ce_oi_strike"], oc["max_pe_oi_strike"]
+        if 0 <= cw - c <= c * 0.006:
+            add("medium", "Breakout watch", f"Call-OI wall at {f(cw)} is just {f(cw - c)} points above",
+                f"Call writers will defend {f(cw)}. If Nifty closes above it, they may rush to cover, which can cause a fast rally.", (cw,))
+        if 0 <= c - pw <= c * 0.006:
+            add("medium", "Breakdown watch", f"Put-OI wall at {f(pw)} is just {f(c - pw)} points below",
+                f"Put writers will defend {f(pw)}. If Nifty closes below it, the fall can speed up.", (pw,))
+
+    order = {"high": 0, "medium": 1, "info": 2}
+    A.sort(key=lambda a: order[a["severity"]])
+    if not A:
+        add("info", "Quiet", "No major setups today", f"Nifty is trading normally. Stick to the levels plan: R1 {f(lv['R1'])} above, S1 {f(lv['S1'])} below.")
+    return A
+
+
+# =====================================================================
 # Main
 # =====================================================================
 def main():
     demo = "--demo" in sys.argv
+    if "--news-only" in sys.argv:
+        return news_only(demo)
     df, vix_s = load_demo() if demo else load_live()
     if "--cut" in sys.argv:
         n = int(sys.argv[sys.argv.index("--cut") + 1])
@@ -435,6 +856,7 @@ def main():
     data = {
         "symbol": "NIFTY 50" + (" (DEMO DATA)" if demo else ""),
         "updated": dt.datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST"),
+        "updated_iso": dt.datetime.now(IST).isoformat(timespec="seconds"),
         "as_of": as_of.strftime("%Y-%m-%d"),
         "dates": [d.strftime("%Y-%m-%d") for d in df.index],
         **{k.lower(): col(df[k]) for k in ["Open", "High", "Low", "Close", "SMA20", "SMA50", "SMA200",
@@ -456,6 +878,10 @@ def main():
                    "plan": make_plan(bias, lv, float(last.Close))},
         "backtest": bt,
         "track": {"entries": track[::-1], "summary": summarize_track(track)},
+        "intraday": get_intraday(demo, float(last.Close)),
+        "playbook": build_playbook(last, lv, oc, vix, bias),
+        "alerts": build_alerts(df, oc, vix, vix_prev, bias, lv),
+        "news": get_news(demo),
     }
     with open("data.json", "w") as f:
         json.dump(data, f)

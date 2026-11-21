@@ -10,7 +10,17 @@ signal against the next day's actual market move.
 3. Actions tab → "Update Nifty data" → Run workflow (creates data.json the first time).
 4. Open https://<your-username>.github.io/<repo>/
 
-After that it refreshes itself every weekday at 4:00 PM IST.
+After that it refreshes itself every weekday at 4:00 PM IST (full analysis)
+and again at 8:30 AM IST (news and FII/DII figures only, before the market opens).
+
+## Login
+The site opens on `login.html`. Demo credentials: **admin / admin123**.
+To change them, edit `USERNAME` and `PASS_HASH` near the bottom of `login.html`
+(the comment at the top of the file shows how to make a new hash).
+This is a browser-only login: it keeps casual visitors out but is not real
+security. Anyone determined can read the page source or open `data.json`
+directly. For real protection, use a private host (for example Cloudflare
+Pages with Cloudflare Access, or Netlify with password protection).
 
 ## Files the script keeps
 - `data.json`  – everything the page shows (rewritten each run)
