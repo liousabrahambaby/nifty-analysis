@@ -635,14 +635,14 @@ function renderPremarket() {
 
   // methods, GIFT status and track record
   const M = PM.model, ready = PM.status === 'ready' && P;
-  const giftOn = ready ? !!P.gift : PM.gift_eve != null;
   let html = `<h2>${ready ? 'How it was worked out' : 'About the forecast'}</h2>`;
   if (PM.status === 'ready' && P) {
     html += P.methods.map(m => `<div class="method"><div class="method-top"><span>${m.name}${m.name === P.method ? ' (used)' : ''}</span>
       <b class="${signCls(m.pct)}">${pctTxt(m.pct)}</b></div><p>${m.detail}</p></div>`).join('');
   }
-  if (!giftOn) html += `<div class="note" style="margin-top:10px">GIFT Nifty isn't connected, so the forecast uses global markets only.
-      There's no free official GIFT Nifty feed; to add it, put your Zerodha Kite API keys in GitHub (see the README).</div>`;
+  if (ready && !P.gift) html += `<div class="note" style="margin-top:10px">GIFT Nifty couldn't be fetched from NSE IX this morning, so this forecast uses global markets only.
+      It's fetched automatically and will be tried again next run.
+      <a href="kite.html" style="display:inline-block;margin-top:6px;font-weight:600;color:var(--ion)">Use Kite instead (optional)</a></div>`;
   if (M) html += `<p class="small mut">Model fitted on ${M.n} sessions: opening gap ≈ ${M.b.toFixed(2)} × S&P 500 move since Nifty closed. It got the direction right ${M.direction_hit}% of the time,
       with a typical error of ${M.mae}%.</p>`;
   html += `<h3>Forecast track record</h3><div class="tiles" style="margin-bottom:6px">
@@ -665,11 +665,19 @@ function spark(vals, up) {
   return `<svg viewBox="0 0 56 22" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${up ? C.bull : C.bear}" stroke-width="1.5" stroke-linejoin="round" opacity=".85"/></svg>`;
 }
 function renderGlobal() {
-  const G = D.global;
+  let G = D.global;
   if (!G || !G.rows.length) { $('globeRows').innerHTML = '<p class="mut">Global market data appears after the next data update.</p>'; return; }
   $('globeUpd').textContent = `Refreshed ${G.updated}. Changes are from each market's previous close.`;
-  const order = ['US futures', 'Asia', 'US', 'Europe', 'Macro'];
-  const label = { 'US futures':'US futures (live)', Asia:'Asia', US:'US (last close)', Europe:'Europe', Macro:'Oil, gold & rates' };
+  const PMx = D.premarket || {}, g = (PMx.prediction && PMx.prediction.gift) || PMx.gift_now;
+  let rowsAll = G.rows.slice();
+  if (g && g.price) {
+    const chg = g.price - g.prev_close;
+    rowsAll.unshift({ region:'GIFT', name:`GIFT Nifty${g.expiry ? ' (' + g.expiry.slice(3) + ')' : ''}`, symbol:'GIFT', last:g.price,
+                      pct: g.prev_close ? chg / g.prev_close * 100 : 0, date: g.time ? String(g.time).slice(0, 17) : '', spark:null });
+  }
+  G = { ...G, rows: rowsAll };
+  const order = ['GIFT', 'US futures', 'Asia', 'US', 'Europe', 'Macro'];
+  const label = { GIFT:'GIFT Nifty', 'US futures':'US futures (live)', Asia:'Asia', US:'US (last close)', Europe:'Europe', Macro:'Oil, gold & rates' };
   const dp = s => ['^TNX', 'INR=X', 'DX-Y.NYB', '^VIX', 'BZ=F'].includes(s) ? 2 : 0;
   $('globeRows').innerHTML = order.map(reg => {
     const rows = G.rows.filter(r => r.region === reg);

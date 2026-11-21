@@ -451,31 +451,120 @@ def demo_global():
     return rows, {"ES=F": round(float(rng.normal(0.2, 0.5)), 3), "NQ=F": round(float(rng.normal(0.3, 0.7)), 3)}
 
 
-def fetch_gift_kite():
-    """GIFT Nifty via Zerodha Kite Connect. Needs KITE_API_KEY and KITE_ACCESS_TOKEN
-    environment variables (GitHub secrets). Kite access tokens expire every day."""
-    key, tok = os.environ.get("KITE_API_KEY"), os.environ.get("KITE_ACCESS_TOKEN")
+KITE = "https://api.kite.trade"
+
+
+def kite_access_token():
+    """Return a Kite access token from the environment. Either KITE_ACCESS_TOKEN is set
+    directly, or KITE_REQUEST_TOKEN (from this morning's login) is exchanged for one
+    using KITE_API_SECRET. Tokens are never printed."""
+    key = os.environ.get("KITE_API_KEY", "").strip()
+    if not key:
+        return None, None
+    tok = os.environ.get("KITE_ACCESS_TOKEN", "").strip()
+    if tok:
+        return key, tok
+    req, secret = os.environ.get("KITE_REQUEST_TOKEN", "").strip(), os.environ.get("KITE_API_SECRET", "").strip()
+    if not req or not secret:
+        return key, None
+    import hashlib
+    import requests
+    checksum = hashlib.sha256((key + req + secret).encode()).hexdigest()
+    r = requests.post(KITE + "/session/token", timeout=20, headers={"X-Kite-Version": "3"},
+                      data={"api_key": key, "request_token": req, "checksum": checksum}).json()
+    if r.get("status") != "success":
+        raise RuntimeError(f"Kite login failed: {r.get('message', 'unknown error')}")
+    return key, r["data"]["access_token"]
+
+
+def fetch_gift_kite(as_of=None):
+    """GIFT Nifty via Zerodha Kite Connect (paid plan). Returns the current price and
+    its price at 3:30 PM IST on the last Nifty session (via the historical API)."""
+    key, tok = kite_access_token()
     if not key or not tok:
         return None
     import requests
+    hdr = {"X-Kite-Version": "3", "Authorization": f"token {key}:{tok}"}
     sym = "NSEIX:GIFT NIFTY"
-    r = requests.get("https://api.kite.trade/quote", params={"i": sym}, timeout=20,
-                     headers={"X-Kite-Version": "3", "Authorization": f"token {key}:{tok}"})
-    q = r.json()["data"][sym]
-    return {"price": float(q["last_price"]), "prev_close": float(q["ohlc"]["close"]),
-            "time": dt.datetime.now(IST).strftime("%d %b, %I:%M %p")}
+    r = requests.get(KITE + "/quote", params={"i": sym}, headers=hdr, timeout=20).json()
+    if r.get("status") != "success" or sym not in r.get("data", {}):
+        raise RuntimeError(f"Kite quote failed: {r.get('message', 'GIFT NIFTY not in response')}")
+    q = r["data"][sym]
+    out = {"price": float(q["last_price"]), "prev_close": float(q["ohlc"]["close"]),
+           "time": dt.datetime.now(IST).strftime("%d %b, %I:%M %p"), "at_nifty_close": None}
+    if as_of:  # GIFT Nifty's price when Nifty closed (3:30 PM IST) on the last session
+        try:
+            h = requests.get(f"{KITE}/instruments/historical/{q['instrument_token']}/5minute", headers=hdr, timeout=20,
+                             params={"from": f"{as_of} 15:00:00", "to": f"{as_of} 15:35:00"}).json()
+            candles = [c for c in h["data"]["candles"] if c[0][11:16] <= "15:25"]
+            if candles:
+                out["at_nifty_close"] = float(candles[-1][4])
+        except Exception as e:
+            print("GIFT Nifty historical lookup failed:", type(e).__name__)
+    return out
 
 
-def get_gift(demo, nifty_close=None):
+NSEIX = "https://www.nseix.com"
+
+
+def fetch_gift_nseix():
+    """GIFT Nifty futures from NSE IX's own public website (no login needed).
+    Returns the most actively traded Nifty futures contract, plus the last price
+    of every contract so the evening run can store a same-contract reference."""
+    import requests
+    hdr = {"User-Agent": NSE_HEADERS["User-Agent"], "Accept": "application/json, text/plain, */*",
+           "Accept-Language": "en-US,en;q=0.9", "Referer": NSEIX + "/"}
+    s = requests.Session()
+    s.headers.update(hdr)
+    try:
+        s.get(NSEIX + "/", timeout=20)
+    except Exception:
+        pass
+    rows = s.get(NSEIX + "/api/derivatives-watch", params={"inst_type1": "IDX", "inst_type2": "STK", "type": "live"},
+                 timeout=20).json()["data"]
+    today = dt.datetime.now(IST).date()
+    futs = []
+    for r in rows:
+        if str(r.get("INSTRUMENTTYPE")).upper() != "FUTIDX" or str(r.get("SYMBOL")).upper() != "NIFTY":
+            continue
+        try:
+            exp = dt.datetime.strptime(r["EXPIRYDATE"], "%d-%b-%Y").date()
+            last = float(r["LASTPRICE"])
+        except Exception:
+            continue
+        if last > 0 and exp >= today:
+            futs.append({"expiry": r["EXPIRYDATE"], "last": last, "close": float(r.get("CLOSE") or 0),
+                         "volume": float(r.get("VOLUME") or 0), "time": r.get("TIMESTMP", "")})
+    if not futs:
+        raise ValueError("No live GIFT Nifty futures in NSE IX response")
+    main = max(futs, key=lambda f: f["volume"])
+    return {"price": main["last"], "prev_close": main["close"] or main["last"], "expiry": main["expiry"],
+            "time": main["time"], "source": "NSE IX", "at_nifty_close": None,
+            "contracts": {f["expiry"]: f["last"] for f in futs}}
+
+
+def get_gift(demo, nifty_close=None, as_of=None):
     if demo:
         move = np.random.default_rng(int(dt.datetime.now().timestamp() * 1000) % 2**32).normal(0.002, 0.005)
-        return {"price": round(nifty_close * (1.002 + move), 1), "prev_close": round(nifty_close * 1.002, 1),
+        price = round(nifty_close * (1.002 + move), 1)
+        return {"price": price, "prev_close": round(nifty_close * 1.002, 1), "expiry": "29-Dec-2026", "source": "NSE IX",
+                "contracts": {"29-Dec-2026": price}, "at_nifty_close": None,
                 "time": dt.datetime.now(IST).strftime("%d %b, %I:%M %p")}
-    try:
-        return fetch_gift_kite()
+    try:  # 1. Kite, if this run was given a login (most precise: exact 3:30 PM reference)
+        g = fetch_gift_kite(as_of)
+        if g:
+            g["source"] = "Kite"
+            print("GIFT Nifty: from Kite")
+            return g
     except Exception as e:
-        print("GIFT Nifty fetch failed:", e)
-        return None
+        print("GIFT Nifty via Kite failed:", e)
+    try:  # 2. NSE IX public website, fully automatic
+        g = fetch_gift_nseix()
+        print("GIFT Nifty: from NSE IX", g["expiry"], g["price"])
+        return g
+    except Exception as e:
+        print("GIFT Nifty via NSE IX failed:", e)
+    return None
 
 
 def fit_gap_model(nifty, demo=False):
@@ -510,11 +599,17 @@ def predict_gap(close, as_of, levels, model, since, gift, gift_eve):
     out = {"close": close, "for_date": next_session(dt.date.fromisoformat(as_of)).strftime("%a %d %b %Y"),
            "made_at": dt.datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST"), "methods": []}
     if gift:
-        ref = gift_eve if gift_eve else gift["prev_close"]
+        eve = None
+        if isinstance(gift_eve, dict):
+            eve = (gift_eve.get("contracts") or {}).get(gift.get("expiry"))
+        elif isinstance(gift_eve, (int, float)):
+            eve = gift_eve
+        ref = gift.get("at_nifty_close") or eve or gift["prev_close"]
+        how = "around Nifty's close yesterday" if (gift.get("at_nifty_close") or eve) else "(its previous close)"
         pct = (gift["price"] - ref) / close * 100
         out["methods"].append({"name": "GIFT Nifty", "pct": round(pct, 2), "pts": round(close * pct / 100, 1),
-                               "detail": f"GIFT Nifty {gift['price']:,.1f} vs {ref:,.1f} "
-                                         f"{'at Nifty close yesterday' if gift_eve else '(its previous close)'}"})
+                               "detail": f"GIFT Nifty {gift['price']:,.1f} now vs {ref:,.1f} {how} "
+                                         f"({gift.get('source', 'GIFT')}{', ' + gift['expiry'] + ' contract' if gift.get('expiry') else ''})."})
     if model and "ES=F" in since:
         pct = model["a"] + model["b"] * since["ES=F"]
         out["methods"].append({"name": "Global cues model", "pct": round(pct, 2), "pts": round(close * pct / 100, 1),
@@ -605,7 +700,7 @@ def premarket(demo):
         fresh["fii_dii"] = data["news"]["fii_dii"]
     data["news"] = fresh
     data["global"] = get_global(demo, data["as_of"])
-    gift = get_gift(demo, data["last"]["close"])
+    gift = get_gift(demo, data["last"]["close"], data["as_of"])
     pm = data.get("premarket", {})
     pred = predict_gap(data["last"]["close"], data["as_of"], data["levels"], pm.get("model"),
                        data["global"]["since_close"], gift, pm.get("gift_eve"))
@@ -1063,8 +1158,12 @@ def premarket_evening(demo, df, close):
     except Exception as e:
         print("Gap model fit failed:", e)
         model = None
-    gift = get_gift(demo, close)
-    return {"status": "waiting", "model": model, "gift_eve": gift["price"] if gift else None,
+    gift = get_gift(demo, close, df.index[-1].strftime("%Y-%m-%d"))
+    eve = None
+    if gift:
+        eve = {"contracts": gift.get("contracts") or ({gift["expiry"]: gift["price"]} if gift.get("expiry") else {}),
+               "price": gift.get("at_nifty_close") or gift["price"], "time": gift.get("time")}
+    return {"status": "waiting", "model": model, "gift_eve": eve, "gift_now": gift,
             "history": hist, "summary": summary,
             "next_run": next_session(df.index[-1].date()).strftime("%a %d %b") + ", about 8:15 AM IST"}
 

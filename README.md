@@ -26,15 +26,21 @@ It always uses a **global cues model**: how far S&P 500 futures have moved since
 Nifty's last close, scaled by how Nifty has historically gapped on such moves
 (refitted on 2 years of data each evening).
 
-**GIFT Nifty is optional.** There's no free, official GIFT Nifty data feed. If you have
-a Zerodha Kite Connect subscription, add two repository secrets
-(Settings -> Secrets and variables -> Actions -> New repository secret):
-- `KITE_API_KEY`
-- `KITE_ACCESS_TOKEN`
-GIFT Nifty is then used as the main method, compared with where it stood at Nifty's
-close the previous evening. Note: Kite access tokens expire every day, so you'd need
-to refresh the secret daily, or run `premarket_local.bat` / `premarket_local.sh` on
-your PC with the variables set there.
+**GIFT Nifty is fetched automatically** from NSE IX's own public website (nseix.com),
+the exchange where it trades. No login or keys needed. The evening run records each
+contract's price around Nifty's close, and the morning run compares the same contract's
+price now with that, which gives the implied gap. If NSE IX blocks GitHub's servers
+(exchanges sometimes block cloud servers), the forecast falls back to the global
+cues model; running `premarket_local.bat` / `.sh` from your PC usually fixes that.
+
+**Optional backup: Zerodha Kite** (paid Kite Connect plan, ₹500/month; needs a manual
+login every morning after 7:35 AM, as the exchange requires).
+1. developers.kite.trade -> your app -> Redirect URL = `https://<your-username>.github.io/<repo>/kite.html`
+2. GitHub -> Settings -> Secrets and variables -> Actions: add `KITE_API_KEY` and `KITE_API_SECRET`
+   (the secret lives only there, never in a file).
+3. Paste your API key (not the secret) into the `KITE_API_KEY` line of `kite.html`.
+Then on any morning: cockpit -> "Use Kite instead" -> log in -> copy the code -> GitHub ->
+Run workflow -> premarket -> paste it. From a PC: `python kite_morning.py`.
 
 ## Login
 The site opens on `login.html`. Demo credentials: **admin / admin123**.
