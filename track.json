@@ -1,0 +1,1461 @@
+{
+ "entries": [
+  {
+   "date": "2026-08-24",
+   "bias": "NONE",
+   "score": 1.5,
+   "close": 24219.05,
+   "levels": {
+    "R2": 24394.1,
+    "R1": 24306.6,
+    "Pivot": 24225.5,
+    "S1": 24137.9,
+    "S2": 24056.8
+   },
+   "vix": 11.53,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-08-25",
+    "next_close": 24334.55,
+    "move": 115.5,
+    "result": "Broke both sides",
+    "points": null,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-08-25",
+   "bias": "NONE",
+   "score": 1.5,
+   "close": 24334.55,
+   "levels": {
+    "R2": 24480.6,
+    "R1": 24407.6,
+    "Pivot": 24261.5,
+    "S1": 24188.5,
+    "S2": 24042.4
+   },
+   "vix": 11.08,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-08-26",
+    "next_close": 24207.75,
+    "move": -126.8,
+    "result": "Stayed in range",
+    "points": null,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-08-26",
+   "bias": "NONE",
+   "score": -0.5,
+   "close": 24207.75,
+   "levels": {
+    "R2": 24435.5,
+    "R1": 24321.6,
+    "Pivot": 24264.7,
+    "S1": 24150.8,
+    "S2": 24093.9
+   },
+   "vix": 10.57,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-08-27",
+    "next_close": 24090.85,
+    "move": -116.9,
+    "result": "Broke below S1",
+    "points": null,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-08-27",
+   "bias": "NONE",
+   "score": -1.5,
+   "close": 24090.85,
+   "levels": {
+    "R2": 24366.3,
+    "R1": 24228.6,
+    "Pivot": 24159.7,
+    "S1": 24022.0,
+    "S2": 23953.1
+   },
+   "vix": 11.07,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-08-28",
+    "next_close": 24175.65,
+    "move": 84.8,
+    "result": "Stayed in range",
+    "points": null,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-08-28",
+   "bias": "NONE",
+   "score": -0.5,
+   "close": 24175.65,
+   "levels": {
+    "R2": 24258.4,
+    "R1": 24217.0,
+    "Pivot": 24146.9,
+    "S1": 24105.6,
+    "S2": 24035.5
+   },
+   "vix": 10.68,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-08-31",
+    "next_close": 24080.4,
+    "move": -95.25,
+    "result": "Broke below S1",
+    "points": null,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-08-31",
+   "bias": "NONE",
+   "score": -1.5,
+   "close": 24080.4,
+   "levels": {
+    "R2": 24202.7,
+    "R1": 24141.5,
+    "Pivot": 24067.6,
+    "S1": 24006.4,
+    "S2": 23932.5
+   },
+   "vix": 11.19,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-01",
+    "next_close": 24055.8,
+    "move": -24.6,
+    "result": "Broke both sides",
+    "points": null,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-09-01",
+   "bias": "NONE",
+   "score": -1.5,
+   "close": 24055.8,
+   "levels": {
+    "R2": 24241.1,
+    "R1": 24148.5,
+    "Pivot": 24050.5,
+    "S1": 23957.9,
+    "S2": 23859.9
+   },
+   "vix": 11.49,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-02",
+    "next_close": 23914.45,
+    "move": -141.35,
+    "result": "Broke below S1",
+    "points": null,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-09-02",
+   "bias": "PUT",
+   "score": -2.5,
+   "close": 23914.45,
+   "levels": {
+    "R2": 23999.5,
+    "R1": 23957.0,
+    "Pivot": 23871.9,
+    "S1": 23829.4,
+    "S2": 23744.3
+   },
+   "vix": 11.59,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-03",
+    "next_close": 23873.45,
+    "move": -41.0,
+    "result": "Not triggered",
+    "points": 0.0,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-09-03",
+   "bias": "PUT",
+   "score": -2.5,
+   "close": 23873.45,
+   "levels": {
+    "R2": 24076.1,
+    "R1": 23974.8,
+    "Pivot": 23924.1,
+    "S1": 23822.8,
+    "S2": 23772.1
+   },
+   "vix": 11.34,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-04",
+    "next_close": 23897.7,
+    "move": 24.25,
+    "result": "Not triggered",
+    "points": 0.0,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-09-04",
+   "bias": "NONE",
+   "score": -1.5,
+   "close": 23897.7,
+   "levels": {
+    "R2": 24043.0,
+    "R1": 23970.3,
+    "Pivot": 23933.1,
+    "S1": 23860.4,
+    "S2": 23823.2
+   },
+   "vix": 10.68,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-07",
+    "next_close": 23779.15,
+    "move": -118.55,
+    "result": "Broke below S1",
+    "points": null,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-09-07",
+   "bias": "PUT",
+   "score": -4.5,
+   "close": 23779.15,
+   "levels": {
+    "R2": 23954.4,
+    "R1": 23866.8,
+    "Pivot": 23802.4,
+    "S1": 23714.7,
+    "S2": 23650.3
+   },
+   "vix": 11.16,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-08",
+    "next_close": 23635.1,
+    "move": -144.05,
+    "result": "Target hit",
+    "points": 64.4,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-09-08",
+   "bias": "PUT",
+   "score": -4.5,
+   "close": 23635.1,
+   "levels": {
+    "R2": 23808.2,
+    "R1": 23721.7,
+    "Pivot": 23672.4,
+    "S1": 23585.8,
+    "S2": 23536.5
+   },
+   "vix": 11.23,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-09",
+    "next_close": 23431.5,
+    "move": -203.6,
+    "result": "Target hit",
+    "points": 49.3,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-09-09",
+   "bias": "PUT",
+   "score": -4.5,
+   "close": 23431.5,
+   "levels": {
+    "R2": 23618.2,
+    "R1": 23524.9,
+    "Pivot": 23478.2,
+    "S1": 23384.8,
+    "S2": 23338.1
+   },
+   "vix": 11.92,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-10",
+    "next_close": 23477.8,
+    "move": 46.3,
+    "result": "Stopped out",
+    "points": -93.4,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-09-10",
+   "bias": "PUT",
+   "score": -4.5,
+   "close": 23477.8,
+   "levels": {
+    "R2": 23565.8,
+    "R1": 23521.8,
+    "Pivot": 23450.9,
+    "S1": 23407.0,
+    "S2": 23336.1
+   },
+   "vix": 11.8,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-11",
+    "next_close": 23398.1,
+    "move": -79.7,
+    "result": "Target hit",
+    "points": 70.9,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-09-11",
+   "bias": "PUT",
+   "score": -4.5,
+   "close": 23398.1,
+   "levels": {
+    "R2": 23575.9,
+    "R1": 23487.0,
+    "Pivot": 23359.2,
+    "S1": 23270.3,
+    "S2": 23142.5
+   },
+   "vix": 12.29,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-15",
+    "next_close": 23118.6,
+    "move": -279.5,
+    "result": "Stopped out",
+    "points": -88.9,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-09-15",
+   "bias": "PUT",
+   "score": -5.0,
+   "close": 23118.6,
+   "levels": {
+    "R2": 23750.9,
+    "R1": 23434.8,
+    "Pivot": 23276.7,
+    "S1": 22960.5,
+    "S2": 22802.4
+   },
+   "vix": 13.43,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-16",
+    "next_close": 23217.6,
+    "move": 99.0,
+    "result": "Not triggered",
+    "points": 0.0,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-09-16",
+   "bias": "PUT",
+   "score": -3.5,
+   "close": 23217.6,
+   "levels": {
+    "R2": 23374.8,
+    "R1": 23296.2,
+    "Pivot": 23206.1,
+    "S1": 23127.5,
+    "S2": 23037.5
+   },
+   "vix": 13.17,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-17",
+    "next_close": 23270.6,
+    "move": 53.0,
+    "result": "Not triggered",
+    "points": 0.0,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-09-17",
+   "bias": "PUT",
+   "score": -3.5,
+   "close": 23270.6,
+   "levels": {
+    "R2": 23445.8,
+    "R1": 23358.2,
+    "Pivot": 23275.9,
+    "S1": 23188.3,
+    "S2": 23106.0
+   },
+   "vix": 12.29,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-18",
+    "next_close": 23346.4,
+    "move": 75.8,
+    "result": "Not triggered",
+    "points": 0.0,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-09-18",
+   "bias": "PUT",
+   "score": -3.5,
+   "close": 23346.4,
+   "levels": {
+    "R2": 23443.3,
+    "R1": 23394.8,
+    "Pivot": 23340.7,
+    "S1": 23292.3,
+    "S2": 23238.2
+   },
+   "vix": 11.39,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-21",
+    "next_close": 23414.3,
+    "move": 67.9,
+    "result": "Not triggered",
+    "points": 0.0,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-09-21",
+   "bias": "PUT",
+   "score": -3.5,
+   "close": 23414.3,
+   "levels": {
+    "R2": 23550.6,
+    "R1": 23482.5,
+    "Pivot": 23398.6,
+    "S1": 23330.5,
+    "S2": 23246.6
+   },
+   "vix": 11.25,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-22",
+    "next_close": 23329.0,
+    "move": -85.3,
+    "result": "Stopped out",
+    "points": -68.1,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-09-22",
+   "bias": "PUT",
+   "score": -3.5,
+   "close": 23329.0,
+   "levels": {
+    "R2": 23571.2,
+    "R1": 23450.1,
+    "Pivot": 23367.9,
+    "S1": 23246.8,
+    "S2": 23164.7
+   },
+   "vix": 11.0,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-23",
+    "next_close": 23446.8,
+    "move": 117.8,
+    "result": "Not triggered",
+    "points": 0.0,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-09-23",
+   "bias": "PUT",
+   "score": -2.5,
+   "close": 23446.8,
+   "levels": {
+    "R2": 23538.4,
+    "R1": 23492.6,
+    "Pivot": 23421.1,
+    "S1": 23375.3,
+    "S2": 23303.7
+   },
+   "vix": 10.35,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-24",
+    "next_close": 23063.1,
+    "move": -383.7,
+    "result": "Target hit",
+    "points": 71.6,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-09-24",
+   "bias": "PUT",
+   "score": -5.0,
+   "close": 23063.1,
+   "levels": {
+    "R2": 23366.2,
+    "R1": 23214.6,
+    "Pivot": 23130.4,
+    "S1": 22978.9,
+    "S2": 22894.6
+   },
+   "vix": 12.69,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-25",
+    "next_close": 23140.5,
+    "move": 77.4,
+    "result": "Not triggered",
+    "points": 0.0,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-09-25",
+   "bias": "PUT",
+   "score": -3.5,
+   "close": 23140.5,
+   "levels": {
+    "R2": 23249.8,
+    "R1": 23195.1,
+    "Pivot": 23108.0,
+    "S1": 23053.4,
+    "S2": 22966.3
+   },
+   "vix": 12.16,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-28",
+    "next_close": 22780.25,
+    "move": -360.25,
+    "result": "Target hit",
+    "points": 87.1,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-09-28",
+   "bias": "PUT",
+   "score": -5.0,
+   "close": 22780.25,
+   "levels": {
+    "R2": 23192.3,
+    "R1": 22986.3,
+    "Pivot": 22874.2,
+    "S1": 22668.2,
+    "S2": 22556.2
+   },
+   "vix": 13.64,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-29",
+    "next_close": 22716.2,
+    "move": -64.05,
+    "result": "Closed at day end",
+    "points": -48.0,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-09-29",
+   "bias": "PUT",
+   "score": -4.5,
+   "close": 22716.2,
+   "levels": {
+    "R2": 22863.3,
+    "R1": 22789.7,
+    "Pivot": 22679.7,
+    "S1": 22606.1,
+    "S2": 22496.1
+   },
+   "vix": 13.41,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-09-30",
+    "next_close": 22620.45,
+    "move": -95.75,
+    "result": "Stopped out",
+    "points": -73.6,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-09-30",
+   "bias": "PUT",
+   "score": -4.5,
+   "close": 22620.45,
+   "levels": {
+    "R2": 22889.1,
+    "R1": 22754.8,
+    "Pivot": 22675.0,
+    "S1": 22540.6,
+    "S2": 22460.8
+   },
+   "vix": 13.49,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-01",
+    "next_close": 22421.95,
+    "move": -198.5,
+    "result": "Target hit",
+    "points": 79.8,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-10-01",
+   "bias": "PUT",
+   "score": -4.5,
+   "close": 22421.95,
+   "levels": {
+    "R2": 22809.9,
+    "R1": 22615.9,
+    "Pivot": 22416.6,
+    "S1": 22222.6,
+    "S2": 22023.3
+   },
+   "vix": 14.46,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-05",
+    "next_close": 22555.75,
+    "move": 133.8,
+    "result": "Not triggered",
+    "points": 0.0,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-10-05",
+   "bias": "PUT",
+   "score": -3.5,
+   "close": 22555.75,
+   "levels": {
+    "R2": 22749.6,
+    "R1": 22652.7,
+    "Pivot": 22524.9,
+    "S1": 22428.0,
+    "S2": 22300.2
+   },
+   "vix": 14.78,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-06",
+    "next_close": 22776.1,
+    "move": 220.35,
+    "result": "Not triggered",
+    "points": 0.0,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-10-06",
+   "bias": "PUT",
+   "score": -3.5,
+   "close": 22776.1,
+   "levels": {
+    "R2": 22919.1,
+    "R1": 22847.6,
+    "Pivot": 22704.6,
+    "S1": 22633.1,
+    "S2": 22490.1
+   },
+   "vix": 13.61,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-07",
+    "next_close": 22603.05,
+    "move": -173.05,
+    "result": "Stopped out",
+    "points": -71.5,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-10-07",
+   "bias": "PUT",
+   "score": -3.5,
+   "close": 22603.05,
+   "levels": {
+    "R2": 22793.7,
+    "R1": 22698.4,
+    "Pivot": 22622.3,
+    "S1": 22527.0,
+    "S2": 22451.0
+   },
+   "vix": 13.89,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-08",
+    "next_close": 22231.8,
+    "move": -371.25,
+    "result": "Target hit",
+    "points": 76.0,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-10-08",
+   "bias": "PUT",
+   "score": -5.0,
+   "close": 22231.8,
+   "levels": {
+    "R2": 22756.1,
+    "R1": 22493.9,
+    "Pivot": 22336.9,
+    "S1": 22074.8,
+    "S2": 21917.8
+   },
+   "vix": 15.28,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-09",
+    "next_close": 22520.45,
+    "move": 288.65,
+    "result": "Not triggered",
+    "points": 0.0,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-10-09",
+   "bias": "PUT",
+   "score": -3.5,
+   "close": 22520.45,
+   "levels": {
+    "R2": 22751.3,
+    "R1": 22635.9,
+    "Pivot": 22465.3,
+    "S1": 22349.9,
+    "S2": 22179.3
+   },
+   "vix": 14.38,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-12",
+    "next_close": 22363.35,
+    "move": -157.1,
+    "result": "Stopped out",
+    "points": -115.4,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-10-12",
+   "bias": "PUT",
+   "score": -3.5,
+   "close": 22363.35,
+   "levels": {
+    "R2": 22786.3,
+    "R1": 22574.8,
+    "Pivot": 22439.6,
+    "S1": 22228.2,
+    "S2": 22093.0
+   },
+   "vix": 15.25,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-13",
+    "next_close": 22721.95,
+    "move": 358.6,
+    "result": "Not triggered",
+    "points": 0.0,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-10-13",
+   "bias": "NONE",
+   "score": -0.5,
+   "close": 22721.95,
+   "levels": {
+    "R2": 23010.9,
+    "R1": 22866.4,
+    "Pivot": 22577.4,
+    "S1": 22432.9,
+    "S2": 22143.9
+   },
+   "vix": 14.12,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-14",
+    "next_close": 22622.7,
+    "move": -99.25,
+    "result": "Stayed in range",
+    "points": null,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-10-14",
+   "bias": "NONE",
+   "score": -0.5,
+   "close": 22622.7,
+   "levels": {
+    "R2": 22845.5,
+    "R1": 22734.1,
+    "Pivot": 22646.5,
+    "S1": 22535.1,
+    "S2": 22447.5
+   },
+   "vix": 14.63,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-15",
+    "next_close": 22997.35,
+    "move": 374.65,
+    "result": "Broke above R1",
+    "points": null,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-10-15",
+   "bias": "NONE",
+   "score": -0.5,
+   "close": 22997.35,
+   "levels": {
+    "R2": 23316.1,
+    "R1": 23156.7,
+    "Pivot": 22897.1,
+    "S1": 22737.7,
+    "S2": 22478.1
+   },
+   "vix": 14.03,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-16",
+    "next_close": 23146.15,
+    "move": 148.8,
+    "result": "Stayed in range",
+    "points": null,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-10-16",
+   "bias": "NONE",
+   "score": -0.5,
+   "close": 23146.15,
+   "levels": {
+    "R2": 23306.0,
+    "R1": 23226.1,
+    "Pivot": 23069.9,
+    "S1": 22990.0,
+    "S2": 22833.9
+   },
+   "vix": 14.06,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-19",
+    "next_close": 22888.95,
+    "move": -257.2,
+    "result": "Broke below S1",
+    "points": null,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-10-19",
+   "bias": "NONE",
+   "score": -0.5,
+   "close": 22888.95,
+   "levels": {
+    "R2": 23300.0,
+    "R1": 23094.5,
+    "Pivot": 22969.7,
+    "S1": 22764.2,
+    "S2": 22639.5
+   },
+   "vix": 14.77,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-21",
+    "next_close": 22811.35,
+    "move": -77.6,
+    "result": "Broke both sides",
+    "points": null,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-10-21",
+   "bias": "NONE",
+   "score": -1.5,
+   "close": 22811.35,
+   "levels": {
+    "R2": 23331.7,
+    "R1": 23071.5,
+    "Pivot": 22860.7,
+    "S1": 22600.5,
+    "S2": 22389.7
+   },
+   "vix": 15.68,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-22",
+    "next_close": 22687.65,
+    "move": -123.7,
+    "result": "Broke below S1",
+    "points": null,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-10-22",
+   "bias": "NONE",
+   "score": -1.5,
+   "close": 22687.65,
+   "levels": {
+    "R2": 22906.0,
+    "R1": 22796.8,
+    "Pivot": 22675.8,
+    "S1": 22566.7,
+    "S2": 22445.7
+   },
+   "vix": 15.76,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-23",
+    "next_close": 22600.0,
+    "move": -87.65,
+    "result": "Broke below S1",
+    "points": null,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-10-23",
+   "bias": "NONE",
+   "score": -1.5,
+   "close": 22600.0,
+   "levels": {
+    "R2": 23001.7,
+    "R1": 22800.8,
+    "Pivot": 22586.4,
+    "S1": 22385.6,
+    "S2": 22171.2
+   },
+   "vix": 16.86,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-26",
+    "next_close": 22753.2,
+    "move": 153.2,
+    "result": "Stayed in range",
+    "points": null,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-10-26",
+   "bias": "NONE",
+   "score": -1.5,
+   "close": 22753.2,
+   "levels": {
+    "R2": 22997.1,
+    "R1": 22875.1,
+    "Pivot": 22631.2,
+    "S1": 22509.3,
+    "S2": 22265.4
+   },
+   "vix": 17.16,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-27",
+    "next_close": 22749.75,
+    "move": -3.45,
+    "result": "Stayed in range",
+    "points": null,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-10-27",
+   "bias": "NONE",
+   "score": -1.5,
+   "close": 22749.75,
+   "levels": {
+    "R2": 22931.7,
+    "R1": 22840.7,
+    "Pivot": 22738.8,
+    "S1": 22647.8,
+    "S2": 22545.9
+   },
+   "vix": 16.4,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-28",
+    "next_close": 22698.85,
+    "move": -50.9,
+    "result": "Broke below S1",
+    "points": null,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-10-28",
+   "bias": "NONE",
+   "score": -1.5,
+   "close": 22698.85,
+   "levels": {
+    "R2": 22938.6,
+    "R1": 22818.7,
+    "Pivot": 22658.2,
+    "S1": 22538.3,
+    "S2": 22377.8
+   },
+   "vix": 16.25,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-29",
+    "next_close": 22936.75,
+    "move": 237.9,
+    "result": "Broke above R1",
+    "points": null,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-10-29",
+   "bias": "NONE",
+   "score": -0.5,
+   "close": 22936.75,
+   "levels": {
+    "R2": 23157.0,
+    "R1": 23046.9,
+    "Pivot": 22851.8,
+    "S1": 22741.7,
+    "S2": 22546.6
+   },
+   "vix": 15.12,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-10-30",
+    "next_close": 23053.1,
+    "move": 116.35,
+    "result": "Broke above R1",
+    "points": null,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-10-30",
+   "bias": "NONE",
+   "score": -0.5,
+   "close": 23053.1,
+   "levels": {
+    "R2": 23238.4,
+    "R1": 23145.8,
+    "Pivot": 23025.4,
+    "S1": 22932.8,
+    "S2": 22812.4
+   },
+   "vix": 15.3,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-11-02",
+    "next_close": 23440.8,
+    "move": 387.7,
+    "result": "Broke above R1",
+    "points": null,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-11-02",
+   "bias": "CALL",
+   "score": 2.5,
+   "close": 23440.8,
+   "levels": {
+    "R2": 23596.6,
+    "R1": 23518.7,
+    "Pivot": 23362.9,
+    "S1": 23285.0,
+    "S2": 23129.1
+   },
+   "vix": 15.5,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-11-03",
+    "next_close": 23810.85,
+    "move": 370.05,
+    "result": "Target hit",
+    "points": 77.9,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-11-03",
+   "bias": "CALL",
+   "score": 2.5,
+   "close": 23810.85,
+   "levels": {
+    "R2": 24029.5,
+    "R1": 23920.2,
+    "Pivot": 23701.5,
+    "S1": 23592.2,
+    "S2": 23373.5
+   },
+   "vix": 15.72,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-11-04",
+    "next_close": 23960.6,
+    "move": 149.75,
+    "result": "Stopped out",
+    "points": -218.7,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-11-04",
+   "bias": "CALL",
+   "score": 2.5,
+   "close": 23960.6,
+   "levels": {
+    "R2": 24136.9,
+    "R1": 24048.7,
+    "Pivot": 23872.4,
+    "S1": 23784.3,
+    "S2": 23608.0
+   },
+   "vix": 15.19,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-11-05",
+    "next_close": 24536.6,
+    "move": 576.0,
+    "result": "Target hit",
+    "points": 88.2,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-11-05",
+   "bias": "CALL",
+   "score": 2.5,
+   "close": 24536.6,
+   "levels": {
+    "R2": 24754.5,
+    "R1": 24645.6,
+    "Pivot": 24470.9,
+    "S1": 24362.0,
+    "S2": 24187.3
+   },
+   "vix": 15.58,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-11-06",
+    "next_close": 25030.35,
+    "move": 493.75,
+    "result": "Stopped out",
+    "points": -174.7,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-11-06",
+   "bias": "NONE",
+   "score": 2.0,
+   "close": 25030.35,
+   "levels": {
+    "R2": 25458.5,
+    "R1": 25244.4,
+    "Pivot": 24816.2,
+    "S1": 24602.2,
+    "S2": 24174.0
+   },
+   "vix": 17.47,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-11-09",
+    "next_close": 25044.65,
+    "move": 14.3,
+    "result": "Stayed in range",
+    "points": null,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-11-09",
+   "bias": "CALL",
+   "score": 2.5,
+   "close": 25044.65,
+   "levels": {
+    "R2": 25234.5,
+    "R1": 25139.6,
+    "Pivot": 24989.2,
+    "S1": 24894.2,
+    "S2": 24743.8
+   },
+   "vix": 17.42,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-11-11",
+    "next_close": 25255.05,
+    "move": 210.4,
+    "result": "Target hit",
+    "points": 94.9,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-11-11",
+   "bias": "CALL",
+   "score": 4.5,
+   "close": 25255.05,
+   "levels": {
+    "R2": 25587.2,
+    "R1": 25421.2,
+    "Pivot": 25258.2,
+    "S1": 25092.2,
+    "S2": 24929.2
+   },
+   "vix": 17.56,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-11-12",
+    "next_close": 25299.35,
+    "move": 44.3,
+    "result": "Not triggered",
+    "points": 0.0,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-11-12",
+   "bias": "CALL",
+   "score": 3.5,
+   "close": 25299.35,
+   "levels": {
+    "R2": 25517.6,
+    "R1": 25408.5,
+    "Pivot": 25275.7,
+    "S1": 25166.6,
+    "S2": 25033.8
+   },
+   "vix": 16.62,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-11-13",
+    "next_close": 25144.3,
+    "move": -155.05,
+    "result": "Not triggered",
+    "points": 0.0,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-11-13",
+   "bias": "CALL",
+   "score": 3.5,
+   "close": 25144.3,
+   "levels": {
+    "R2": 25340.3,
+    "R1": 25242.3,
+    "Pivot": 25148.4,
+    "S1": 25050.4,
+    "S2": 24956.4
+   },
+   "vix": 15.5,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-11-16",
+    "next_close": 25291.1,
+    "move": 146.8,
+    "result": "Closed at day end",
+    "points": 48.8,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-11-16",
+   "bias": "CALL",
+   "score": 3.5,
+   "close": 25291.1,
+   "levels": {
+    "R2": 25432.4,
+    "R1": 25361.8,
+    "Pivot": 25266.9,
+    "S1": 25196.3,
+    "S2": 25101.4
+   },
+   "vix": 15.68,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-11-17",
+    "next_close": 25387.4,
+    "move": 96.3,
+    "result": "Target hit",
+    "points": 70.6,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-11-17",
+   "bias": "CALL",
+   "score": 3.5,
+   "close": 25387.4,
+   "levels": {
+    "R2": 25619.4,
+    "R1": 25503.4,
+    "Pivot": 25385.4,
+    "S1": 25269.4,
+    "S2": 25151.3
+   },
+   "vix": 15.52,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-11-18",
+    "next_close": 25227.95,
+    "move": -159.45,
+    "result": "Not triggered",
+    "points": 0.0,
+    "direction_ok": false
+   }
+  },
+  {
+   "date": "2026-11-18",
+   "bias": "CALL",
+   "score": 3.5,
+   "close": 25227.95,
+   "levels": {
+    "R2": 25502.5,
+    "R1": 25365.2,
+    "Pivot": 25253.5,
+    "S1": 25116.2,
+    "S2": 25004.5
+   },
+   "vix": 15.57,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-11-19",
+    "next_close": 25514.3,
+    "move": 286.35,
+    "result": "Stopped out",
+    "points": -111.7,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-11-19",
+   "bias": "CALL",
+   "score": 3.5,
+   "close": 25514.3,
+   "levels": {
+    "R2": 25787.3,
+    "R1": 25650.8,
+    "Pivot": 25377.8,
+    "S1": 25241.3,
+    "S2": 24968.3
+   },
+   "vix": 16.11,
+   "pcr": null,
+   "backfilled": true,
+   "outcome": {
+    "next_date": "2026-11-20",
+    "next_close": 25800.6,
+    "move": 286.3,
+    "result": "Stopped out",
+    "points": -273.0,
+    "direction_ok": true
+   }
+  },
+  {
+   "date": "2026-11-20",
+   "bias": "CALL",
+   "score": 4.0,
+   "close": 25800.6,
+   "levels": {
+    "R2": 26115.1,
+    "R1": 25957.9,
+    "Pivot": 25651.5,
+    "S1": 25494.3,
+    "S2": 25187.9
+   },
+   "vix": 17.32,
+   "pcr": 1.67,
+   "backfilled": false,
+   "outcome": null
+  }
+ ]
+}
