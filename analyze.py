@@ -509,8 +509,8 @@ NSEIX = "https://www.nseix.com"
 
 def fetch_gift_nseix():
     """GIFT Nifty futures from NSE IX's own public website (no login needed).
-    Returns the most actively traded Nifty futures contract, plus the last price
-    of every contract so the evening run can store a same-contract reference."""
+    Returns the nearest-expiry (current month) Nifty futures contract, plus the last
+    price of every contract so the evening run can store a same-contract reference."""
     import requests
     hdr = {"User-Agent": NSE_HEADERS["User-Agent"], "Accept": "application/json, text/plain, */*",
            "Accept-Language": "en-US,en;q=0.9", "Referer": NSEIX + "/"}
@@ -522,7 +522,8 @@ def fetch_gift_nseix():
         pass
     rows = s.get(NSEIX + "/api/derivatives-watch", params={"inst_type1": "IDX", "inst_type2": "STK", "type": "live"},
                  timeout=20).json()["data"]
-    today = dt.datetime.now(IST).date()
+    now = dt.datetime.now(IST)
+    today = now.date()
     futs = []
     for r in rows:
         if str(r.get("INSTRUMENTTYPE")).upper() != "FUTIDX" or str(r.get("SYMBOL")).upper() != "NIFTY":
@@ -532,12 +533,14 @@ def fetch_gift_nseix():
             last = float(r["LASTPRICE"])
         except Exception:
             continue
-        if last > 0 and exp >= today:
+        # On expiry day the expiring contract stops trading in the afternoon; roll to the next one
+        expired = exp < today or (exp == today and now.time() >= dt.time(15, 30))
+        if last > 0 and not expired:
             futs.append({"expiry": r["EXPIRYDATE"], "last": last, "close": float(r.get("CLOSE") or 0),
                          "volume": float(r.get("VOLUME") or 0), "time": r.get("TIMESTMP", "")})
     if not futs:
         raise ValueError("No live GIFT Nifty futures in NSE IX response")
-    main = max(futs, key=lambda f: f["volume"])
+    main = min(futs, key=lambda f: dt.datetime.strptime(f["expiry"], "%d-%b-%Y"))  # current-month contract
     return {"price": main["last"], "prev_close": main["close"] or main["last"], "expiry": main["expiry"],
             "time": main["time"], "source": "NSE IX", "at_nifty_close": None,
             "contracts": {f["expiry"]: f["last"] for f in futs}}
@@ -547,8 +550,8 @@ def get_gift(demo, nifty_close=None, as_of=None):
     if demo:
         move = np.random.default_rng(int(dt.datetime.now().timestamp() * 1000) % 2**32).normal(0.002, 0.005)
         price = round(nifty_close * (1.002 + move), 1)
-        return {"price": price, "prev_close": round(nifty_close * 1.002, 1), "expiry": "29-Dec-2026", "source": "NSE IX",
-                "contracts": {"29-Dec-2026": price}, "at_nifty_close": None,
+        return {"price": price, "prev_close": round(nifty_close * 1.002, 1), "expiry": "24-Nov-2026", "source": "NSE IX",
+                "contracts": {"24-Nov-2026": price, "29-Dec-2026": round(price * 1.004, 1)}, "at_nifty_close": None,
                 "time": dt.datetime.now(IST).strftime("%d %b, %I:%M %p")}
     try:  # 1. Kite, if this run was given a login (most precise: exact 3:30 PM reference)
         g = fetch_gift_kite(as_of)
