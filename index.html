@@ -110,6 +110,42 @@
   .alert .lv span { font:600 13px var(--display); padding:2px 8px; border-radius:4px; background:rgba(14,20,51,.7); border:1px solid var(--line); }
   .more { margin-top:10px; background:none; border:0; color:var(--ion); font:500 14px var(--body); cursor:pointer; padding:4px 0; }
 
+  /* ---------- opening forecast ---------- */
+  .pm, .globe { margin-top:22px; }
+  .pm-grid { display:grid; gap:16px; grid-template-columns:1fr; }
+  @media (min-width:900px){ .pm-grid { grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); } }
+  .gapcard { clip-path:var(--chamfer); padding:20px 22px; background:var(--panel-solid); }
+  .gapcard.up { background:linear-gradient(150deg, rgba(46,229,157,.24), var(--panel-solid) 60%); }
+  .gapcard.down { background:linear-gradient(150deg, rgba(255,92,122,.24), var(--panel-solid) 60%); }
+  .gapcard.flat, .gapcard.wait { background:linear-gradient(150deg, rgba(69,216,255,.14), var(--panel-solid) 60%); }
+  .gap-call { font-family:var(--display); font-weight:700; font-size:clamp(30px,5vw,44px); line-height:1.05; margin:4px 0 6px; }
+  .gapcard.up .gap-call { color:var(--bull); } .gapcard.down .gap-call { color:var(--bear); } .gapcard.flat .gap-call { color:var(--ion); }
+  .gap-nums { display:flex; flex-wrap:wrap; gap:8px 26px; margin:10px 0 14px; }
+  .gap-nums div span { display:block; font-size:12px; color:var(--mut); }
+  .gap-nums div b { font-family:var(--display); font-size:22px; font-weight:600; }
+  .gapcard p { margin:8px 0 0; font-size:14px; color:#C9D0F0; }
+  .agree { display:inline-block; margin-top:12px; font-size:13px; padding:4px 10px; border-radius:4px; background:rgba(14,20,51,.6); border:1px solid var(--line); }
+  .method { padding:10px 0; border-bottom:1px solid rgba(42,53,112,.7); }
+  .method:last-of-type { border-bottom:0; }
+  .method-top { display:flex; justify-content:space-between; gap:10px; font-weight:600; }
+  .method-top b { font-family:var(--display); }
+  .method p { margin:4px 0 0; font-size:13px; color:#C9D0F0; }
+  .hist { width:100%; margin-top:6px; }
+  .hist td { font-size:13px; white-space:nowrap; }
+
+  /* ---------- global markets ---------- */
+  .region { display:grid; grid-template-columns:1fr; gap:8px; margin-bottom:12px; }
+  @media (min-width:900px){ .region { grid-template-columns:110px 1fr; align-items:start; } }
+  .region h3 { font-family:var(--display); font-weight:600; font-size:14px; color:var(--mut); margin:10px 0 0; }
+  .mkts { display:grid; gap:8px; grid-template-columns:repeat(auto-fill, minmax(165px, 1fr)); }
+  @media (max-width:640px){ .mkts { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+  .mkt { border:1px solid var(--line); border-radius:6px; padding:9px 11px; background:var(--panel); position:relative; min-width:0; }
+  .mkt .n { font-size:12.5px; color:var(--mut); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mkt .v { font-family:var(--display); font-weight:600; font-size:17px; margin-top:1px; }
+  .mkt .c { font-family:var(--display); font-size:13px; }
+  .mkt svg { position:absolute; right:8px; bottom:9px; width:56px; height:22px; overflow:visible; }
+  .mkt .d { font-size:11px; color:var(--mut); }
+
   /* ---------- news ---------- */
   .newsblock { margin-top:22px; }
   .news-grid { display:grid; gap:16px; grid-template-columns:1fr; }
@@ -279,6 +315,27 @@
     </div>
     <div class="alert-list" id="alertList"></div>
     <button class="more" id="alertMore" hidden></button>
+  </section>
+
+  <!-- ===== Pre-market outlook ===== -->
+  <section class="pm" aria-labelledby="pmTitle">
+    <div class="alerts-head">
+      <h2 id="pmTitle">Opening forecast</h2>
+      <span class="small mut" id="pmSub"></span>
+    </div>
+    <div class="pm-grid">
+      <div class="gapcard" id="gapCard"></div>
+      <div class="box" id="gapDetail"></div>
+    </div>
+  </section>
+
+  <!-- ===== Global markets ===== -->
+  <section class="globe" aria-labelledby="globeTitle">
+    <div class="alerts-head">
+      <h2 id="globeTitle">Global markets</h2>
+      <span class="small mut" id="globeUpd"></span>
+    </div>
+    <div id="globeRows"></div>
   </section>
 
   <!-- ===== News & money flows ===== -->
@@ -535,6 +592,88 @@ function renderAlerts() {
 $('alertMore').onclick = () => { alertsOpen = !alertsOpen; renderAlerts(); };
 $('signout').onclick = () => { sessionStorage.removeItem('nc_auth'); localStorage.removeItem('nc_auth'); location.replace('login.html'); };
 
+/* ---------- opening forecast ---------- */
+function signCls(v) { return v == null ? '' : Math.abs(v) < 0.15 ? '' : v > 0 ? 'pos' : 'neg'; }
+function pctTxt(v) { return `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}%`; }
+function renderPremarket() {
+  const PM = D.premarket;
+  if (!PM) { $('gapCard').innerHTML = '<p class="mut">The opening forecast appears after the next data update.</p>'; $('gapDetail').hidden = true; return; }
+  const P = PM.prediction, S = PM.summary || {}, H = PM.history || [];
+  const card = $('gapCard'), today = new Date().toISOString().slice(0, 10);
+
+  if (PM.status === 'ready' && P) {
+    const dir = Math.abs(P.pct) < 0.15 ? 'flat' : P.pct > 0 ? 'up' : 'down';
+    card.className = 'gapcard ' + dir;
+    $('pmSub').textContent = `Made ${P.made_at}`;
+    card.innerHTML = `<div class="small mut">Nifty opening for ${P.for_date}</div>
+      <div class="gap-call">${P.call === 'Flat open' ? 'Flat open likely' : P.call + ' likely'}</div>
+      <div class="gap-nums">
+        <div><span>Expected gap</span><b class="${signCls(P.pct)}">${P.pts >= 0 ? '+' : '−'}${fmt(Math.abs(P.pts), 0)} pts</b></div>
+        <div><span>In percent</span><b class="${signCls(P.pct)}">${pctTxt(P.pct)}</b></div>
+        <div><span>Expected open near</span><b>${fmt(P.open_est, 0)}</b></div>
+      </div>
+      <p>${P.meaning}</p>
+      ${P.agreement ? `<span class="agree">${P.agreement}</span>` : ''}`;
+  } else {
+    card.className = 'gapcard wait';
+    const last = H.find(h => h.actual_pct != null);
+    $('pmSub').textContent = PM.next_run ? `Next forecast ${PM.next_run}` : '';
+    card.innerHTML = `<div class="small mut">Next forecast</div>
+      <div class="gap-call" style="font-size:clamp(24px,4vw,34px)">${PM.next_run || 'Tomorrow, about 8:15 AM IST'}</div>
+      <p>The forecast is made before the market opens, using GIFT Nifty (if connected) and how US futures and Asian markets have moved since Nifty closed.</p>
+      ${last ? `<p style="margin-top:14px"><b>Last forecast, ${last.date}:</b> ${last.call} (${pctTxt(last.pct)}).
+        Actual: ${last.actual_call} (${pctTxt(last.actual_pct)}), open ${fmt(last.actual_open, 0)}.
+        <b class="${last.right_direction ? 'pos' : 'neg'}">${last.right_direction ? 'Right call' : 'Missed'}</b></p>` : ''}`;
+  }
+
+  // methods, GIFT status and track record
+  const M = PM.model, ready = PM.status === 'ready' && P;
+  const giftOn = ready ? !!P.gift : PM.gift_eve != null;
+  let html = `<h2>${ready ? 'How it was worked out' : 'About the forecast'}</h2>`;
+  if (PM.status === 'ready' && P) {
+    html += P.methods.map(m => `<div class="method"><div class="method-top"><span>${m.name}${m.name === P.method ? ' (used)' : ''}</span>
+      <b class="${signCls(m.pct)}">${pctTxt(m.pct)}</b></div><p>${m.detail}</p></div>`).join('');
+  }
+  if (!giftOn) html += `<div class="note" style="margin-top:10px">GIFT Nifty isn't connected, so the forecast uses global markets only.
+      There's no free official GIFT Nifty feed; to add it, put your Zerodha Kite API keys in GitHub (see the README).</div>`;
+  if (M) html += `<p class="small mut">Model fitted on ${M.n} sessions: opening gap ≈ ${M.b.toFixed(2)} × S&P 500 move since Nifty closed. It got the direction right ${M.direction_hit}% of the time,
+      with a typical error of ${M.mae}%.</p>`;
+  html += `<h3>Forecast track record</h3><div class="tiles" style="margin-bottom:6px">
+      <div class="tile"><span>Forecasts graded</span><b>${S.graded ?? 0}</b></div>
+      <div class="tile"><span>Right direction</span><b>${S.hit_rate != null ? S.hit_rate + '%' : '–'}</b></div>
+      <div class="tile"><span>Average miss</span><b>${S.avg_error_pts != null ? fmt(S.avg_error_pts, 0) + ' pts' : '–'}</b></div></div>`;
+  const rows = H.slice(0, 6);
+  if (rows.length) html += `<div style="overflow-x:auto"><table class="hist"><tr><th>Date</th><th>Forecast</th><th>Actual</th><th></th></tr>${rows.map(h => `<tr>
+      <td>${h.date}</td><td class="${signCls(h.pct)}">${h.call} ${pctTxt(h.pct)}</td>
+      <td>${h.actual_pct != null ? `<span class="${signCls(h.actual_pct)}">${pctTxt(h.actual_pct)}</span>` : '<span class="mut">after open</span>'}</td>
+      <td>${h.actual_pct != null ? (h.right_direction ? '<span class="pos">✓</span>' : '<span class="neg">✗</span>') : ''}</td></tr>`).join('')}</table></div>`;
+  $('gapDetail').innerHTML = html;
+}
+
+/* ---------- global markets ---------- */
+function spark(vals, up) {
+  if (!vals || vals.length < 2) return '';
+  const lo = Math.min(...vals), hi = Math.max(...vals), r = hi - lo || 1;
+  const pts = vals.map((v, i) => `${(i / (vals.length - 1) * 56).toFixed(1)},${(22 - (v - lo) / r * 22).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 56 22" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${up ? C.bull : C.bear}" stroke-width="1.5" stroke-linejoin="round" opacity=".85"/></svg>`;
+}
+function renderGlobal() {
+  const G = D.global;
+  if (!G || !G.rows.length) { $('globeRows').innerHTML = '<p class="mut">Global market data appears after the next data update.</p>'; return; }
+  $('globeUpd').textContent = `Refreshed ${G.updated}. Changes are from each market's previous close.`;
+  const order = ['US futures', 'Asia', 'US', 'Europe', 'Macro'];
+  const label = { 'US futures':'US futures (live)', Asia:'Asia', US:'US (last close)', Europe:'Europe', Macro:'Oil, gold & rates' };
+  const dp = s => ['^TNX', 'INR=X', 'DX-Y.NYB', '^VIX', 'BZ=F'].includes(s) ? 2 : 0;
+  $('globeRows').innerHTML = order.map(reg => {
+    const rows = G.rows.filter(r => r.region === reg);
+    if (!rows.length) return '';
+    return `<div class="region"><h3>${label[reg]}</h3><div class="mkts">${rows.map(r => `<div class="mkt" title="${r.name}: ${r.date}">
+        <div class="n">${r.name}</div><div class="v">${fmt(r.last, dp(r.symbol))}</div>
+        <div class="c ${r.pct >= 0 ? 'pos' : 'neg'}">${r.pct >= 0 ? '▲' : '▼'} ${Math.abs(r.pct).toFixed(2)}%</div>
+        <div class="d">${r.date}</div>${spark(r.spark, r.pct >= 0)}</div>`).join('')}</div></div>`;
+  }).join('');
+}
+
 /* ---------- news ---------- */
 let newsTopic = 'All';
 function ago(iso) {
@@ -595,7 +734,7 @@ function render() {
   $('hBias').textContent = short(S.bias); $('hBias').className = cls(S.bias);
   $('hVix').innerHTML = V ? `${V.value} <span class="small ${V.change_pct > 0 ? 'neg' : 'pos'}">${V.change_pct > 0 ? '+' : ''}${V.change_pct}%</span>` : 'n/a';
   $('hPcr').textContent = O ? O.pcr + (O.stale ? ' (old)' : '') : 'n/a';
-  renderLadder(); renderAlerts(); renderNews();
+  renderLadder(); renderAlerts(); renderPremarket(); renderGlobal(); renderNews();
   window.onresize = () => { clearTimeout(window._lr); window._lr = setTimeout(renderLadder, 150); };
 
   $('sigBox').className = 'signal ' + cls(S.bias);

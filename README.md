@@ -10,8 +10,31 @@ signal against the next day's actual market move.
 3. Actions tab → "Update Nifty data" → Run workflow (creates data.json the first time).
 4. Open https://<your-username>.github.io/<repo>/
 
-After that it refreshes itself every weekday at 4:00 PM IST (full analysis)
-and again at 8:30 AM IST (news and FII/DII figures only, before the market opens).
+After that it refreshes itself every weekday:
+- 4:00 PM IST: full analysis after the market closes
+- 8:15 AM IST: pre-market run with news, FII/DII, global markets and the opening-gap forecast
+  (GitHub often starts scheduled runs 5-20 minutes late, so it's usually ready by about 8:30)
+
+To run either one by hand: Actions -> Update Nifty data -> Run workflow -> choose "full" or "premarket".
+
+## Opening-gap forecast and GIFT Nifty
+Every morning the forecast predicts a gap up, gap down or flat open, with points and
+an expected opening level. It's graded against the actual open in the evening run
+(saved in `gap_track.json`).
+
+It always uses a **global cues model**: how far S&P 500 futures have moved since
+Nifty's last close, scaled by how Nifty has historically gapped on such moves
+(refitted on 2 years of data each evening).
+
+**GIFT Nifty is optional.** There's no free, official GIFT Nifty data feed. If you have
+a Zerodha Kite Connect subscription, add two repository secrets
+(Settings -> Secrets and variables -> Actions -> New repository secret):
+- `KITE_API_KEY`
+- `KITE_ACCESS_TOKEN`
+GIFT Nifty is then used as the main method, compared with where it stood at Nifty's
+close the previous evening. Note: Kite access tokens expire every day, so you'd need
+to refresh the secret daily, or run `premarket_local.bat` / `premarket_local.sh` on
+your PC with the variables set there.
 
 ## Login
 The site opens on `login.html`. Demo credentials: **admin / admin123**.
@@ -34,6 +57,7 @@ Fix: run the update from your own computer instead.
 - Windows: install Python + Git, `pip install -r requirements.txt`, then schedule
   `update_local.bat` in Task Scheduler for weekdays 4:00 PM.
 - Mac/Linux: schedule `update_local.sh` with cron (`0 16 * * 1-5`).
+For the morning forecast, schedule `premarket_local.bat` / `premarket_local.sh` at 8:15 AM.
 You can then disable the GitHub workflow (Actions → workflow → Disable).
 
 ## Testing

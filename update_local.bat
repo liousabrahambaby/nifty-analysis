@@ -6,5 +6,6 @@ git pull -q
 python analyze.py
 git add data.json track.json
 if exist oc_cache.json git add oc_cache.json
+if exist gap_track.json git add gap_track.json
 git commit -qm "Local data update"
 git push -q

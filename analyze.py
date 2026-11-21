@@ -378,6 +378,247 @@ def get_news(demo):
     return {"items": items, "fii_dii": flows, "updated": dt.datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")}
 
 
+# =====================================================================
+# Global markets, GIFT Nifty and the opening-gap forecast
+# =====================================================================
+GLOBAL = [
+    ("US", "Dow Jones", "^DJI"), ("US", "S&P 500", "^GSPC"), ("US", "Nasdaq", "^IXIC"),
+    ("US futures", "S&P 500 futures", "ES=F"), ("US futures", "Nasdaq futures", "NQ=F"), ("US futures", "Dow futures", "YM=F"),
+    ("Asia", "Nikkei 225", "^N225"), ("Asia", "Hang Seng", "^HSI"), ("Asia", "Shanghai", "000001.SS"),
+    ("Asia", "Kospi", "^KS11"), ("Asia", "Taiwan", "^TWII"), ("Asia", "ASX 200", "^AXJO"),
+    ("Europe", "FTSE 100", "^FTSE"), ("Europe", "DAX", "^GDAXI"), ("Europe", "CAC 40", "^FCHI"), ("Europe", "Euro Stoxx 50", "^STOXX50E"),
+    ("Macro", "Brent crude", "BZ=F"), ("Macro", "Gold", "GC=F"), ("Macro", "Dollar index", "DX-Y.NYB"),
+    ("Macro", "USD/INR", "INR=X"), ("Macro", "US 10-yr yield", "^TNX"), ("Macro", "US VIX", "^VIX"),
+]
+GAP_FLAT = 0.15   # |gap| below this % counts as a flat open
+GAP_BIG = 0.75    # above this % counts as a big gap
+GAP_TRACK = "gap_track.json"
+
+
+def gap_label(pct):
+    if pct is None:
+        return "Unknown"
+    if abs(pct) < GAP_FLAT:
+        return "Flat open"
+    size = "Big gap" if abs(pct) >= GAP_BIG else "Gap"
+    return f"{size} {'up' if pct > 0 else 'down'}"
+
+
+def _india_close_utc(as_of):
+    return pd.Timestamp(f"{as_of} 10:00", tz="UTC")   # 3:30 PM IST
+
+
+def fetch_global(as_of):
+    import yfinance as yf
+    tickers = [t for _, _, t in GLOBAL]
+    raw = yf.download(tickers, period="1mo", interval="1d", group_by="ticker", auto_adjust=False, progress=False, threads=True)
+    rows = []
+    for region, name, t in GLOBAL:
+        try:
+            cl = raw[t]["Close"].dropna()
+            last, prev = float(cl.iloc[-1]), float(cl.iloc[-2])
+            rows.append({"region": region, "name": name, "symbol": t, "last": round(last, 2),
+                         "change": round(last - prev, 2), "pct": round((last / prev - 1) * 100, 2),
+                         "date": cl.index[-1].strftime("%d %b"), "spark": [round(float(v), 2) for v in cl.iloc[-10:]]})
+        except Exception as e:
+            print("Global ticker failed:", t, e)
+    # US futures move since Nifty's last close: the best single clue for the next open
+    since = {}
+    for t in ("ES=F", "NQ=F"):
+        try:
+            f = _yf(t, period="5d", interval="15m")["Close"].dropna()
+            idx = f.index if f.index.tz is not None else f.index.tz_localize("UTC")
+            f.index = idx.tz_convert("UTC")
+            ref = f[f.index <= _india_close_utc(as_of)]
+            if len(ref):
+                since[t] = round((float(f.iloc[-1]) / float(ref.iloc[-1]) - 1) * 100, 3)
+        except Exception as e:
+            print("Futures intraday failed:", t, e)
+    return rows, since
+
+
+def demo_global():
+    rng = np.random.default_rng(int(dt.datetime.now().strftime("%H%M")))
+    rows = []
+    base = {"^DJI": 44000, "^GSPC": 6100, "^IXIC": 19800, "ES=F": 6120, "NQ=F": 21500, "YM=F": 44100, "^N225": 39000,
+            "^HSI": 20500, "000001.SS": 3350, "^KS11": 2550, "^TWII": 22500, "^AXJO": 8300, "^FTSE": 8300, "^GDAXI": 20000,
+            "^FCHI": 7400, "^STOXX50E": 5000, "BZ=F": 74, "GC=F": 2650, "DX-Y.NYB": 106.5, "INR=X": 84.4, "^TNX": 4.4, "^VIX": 16}
+    for region, name, t in GLOBAL:
+        spark = list(base[t] * np.exp(np.cumsum(rng.normal(0, 0.008, 10))))
+        rows.append({"region": region, "name": name, "symbol": t, "last": round(spark[-1], 2),
+                     "change": round(spark[-1] - spark[-2], 2), "pct": round((spark[-1] / spark[-2] - 1) * 100, 2),
+                     "date": dt.date.today().strftime("%d %b"), "spark": [round(v, 2) for v in spark]})
+    return rows, {"ES=F": round(float(rng.normal(0.2, 0.5)), 3), "NQ=F": round(float(rng.normal(0.3, 0.7)), 3)}
+
+
+def fetch_gift_kite():
+    """GIFT Nifty via Zerodha Kite Connect. Needs KITE_API_KEY and KITE_ACCESS_TOKEN
+    environment variables (GitHub secrets). Kite access tokens expire every day."""
+    key, tok = os.environ.get("KITE_API_KEY"), os.environ.get("KITE_ACCESS_TOKEN")
+    if not key or not tok:
+        return None
+    import requests
+    sym = "NSEIX:GIFT NIFTY"
+    r = requests.get("https://api.kite.trade/quote", params={"i": sym}, timeout=20,
+                     headers={"X-Kite-Version": "3", "Authorization": f"token {key}:{tok}"})
+    q = r.json()["data"][sym]
+    return {"price": float(q["last_price"]), "prev_close": float(q["ohlc"]["close"]),
+            "time": dt.datetime.now(IST).strftime("%d %b, %I:%M %p")}
+
+
+def get_gift(demo, nifty_close=None):
+    if demo:
+        move = np.random.default_rng(int(dt.datetime.now().timestamp() * 1000) % 2**32).normal(0.002, 0.005)
+        return {"price": round(nifty_close * (1.002 + move), 1), "prev_close": round(nifty_close * 1.002, 1),
+                "time": dt.datetime.now(IST).strftime("%d %b, %I:%M %p")}
+    try:
+        return fetch_gift_kite()
+    except Exception as e:
+        print("GIFT Nifty fetch failed:", e)
+        return None
+
+
+def fit_gap_model(nifty, demo=False):
+    """Fit: Nifty opening gap % = a + b × (S&P 500 move % since Nifty's previous close)."""
+    if demo:
+        spx = nifty["Close"] * np.exp(np.random.default_rng(5).normal(0, 0.006, len(nifty)))
+        spx.index = nifty.index - pd.Timedelta(days=1)
+    else:
+        spx = _yf("^GSPC")["Close"].dropna()
+    spx.index = pd.to_datetime(spx.index).tz_localize(None) if getattr(spx.index, "tz", None) else pd.to_datetime(spx.index)
+    xs, ys = [], []
+    dates = nifty.index
+    for i in range(1, len(dates)):
+        t, tp = dates[i], dates[i - 1]
+        a, b = spx[spx.index < t], spx[spx.index < tp]
+        if len(a) == 0 or len(b) == 0:
+            continue
+        xs.append(float(a.iloc[-1] / b.iloc[-1] - 1) * 100)
+        ys.append(float(nifty["Open"].iloc[i] / nifty["Close"].iloc[i - 1] - 1) * 100)
+    x, y = np.array(xs), np.array(ys)
+    if demo:
+        y = 0.05 + 0.55 * x + np.random.default_rng(6).normal(0, 0.25, len(x))
+    b, a = np.polyfit(x, y, 1)
+    pred = a + b * x
+    big = np.abs(y) >= GAP_FLAT
+    return {"a": round(float(a), 4), "b": round(float(b), 4), "r": round(float(np.corrcoef(x, y)[0, 1]), 2),
+            "direction_hit": round(float((np.sign(pred[big]) == np.sign(y[big])).mean() * 100), 1),
+            "mae": round(float(np.abs(pred - y).mean()), 2), "n": int(len(x))}
+
+
+def predict_gap(close, as_of, levels, model, since, gift, gift_eve):
+    out = {"close": close, "for_date": next_session(dt.date.fromisoformat(as_of)).strftime("%a %d %b %Y"),
+           "made_at": dt.datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST"), "methods": []}
+    if gift:
+        ref = gift_eve if gift_eve else gift["prev_close"]
+        pct = (gift["price"] - ref) / close * 100
+        out["methods"].append({"name": "GIFT Nifty", "pct": round(pct, 2), "pts": round(close * pct / 100, 1),
+                               "detail": f"GIFT Nifty {gift['price']:,.1f} vs {ref:,.1f} "
+                                         f"{'at Nifty close yesterday' if gift_eve else '(its previous close)'}"})
+    if model and "ES=F" in since:
+        pct = model["a"] + model["b"] * since["ES=F"]
+        out["methods"].append({"name": "Global cues model", "pct": round(pct, 2), "pts": round(close * pct / 100, 1),
+                               "detail": f"S&P 500 futures {since['ES=F']:+.2f}% since Nifty closed. Historically Nifty gaps about "
+                                         f"{model['b']:.2f}× that move (right direction {model['direction_hit']}% of the time)."})
+    if not out["methods"]:
+        out["status"] = "unavailable"
+        return out
+    main = out["methods"][0]
+    out.update(status="ready", method=main["name"], pct=main["pct"], pts=main["pts"], call=gap_label(main["pct"]),
+               open_est=round(close + main["pts"], 1))
+    if len(out["methods"]) > 1:
+        a, b = out["methods"][0]["pct"], out["methods"][1]["pct"]
+        d = lambda v: 0 if abs(v) < GAP_FLAT else int(np.sign(v))
+        same = d(a) == d(b)
+        out["agreement"] = "Both methods agree, so confidence is higher." if same else \
+            "The two methods disagree, so treat this call with extra caution."
+    o, f = out["open_est"], lambda v: f"{v:,.0f}"
+    if o > levels["R1"]:
+        out["meaning"] = f"An open near {f(o)} would be above R1 {f(levels['R1'])}, in the call-trigger zone. Wait 15 minutes to see if it holds before buying calls."
+    elif o < levels["S1"]:
+        out["meaning"] = f"An open near {f(o)} would be below S1 {f(levels['S1'])}, in the put-trigger zone. Wait 15 minutes to see if it holds before buying puts."
+    else:
+        out["meaning"] = f"An open near {f(o)} would be inside the S1–R1 range ({f(levels['S1'])} to {f(levels['R1'])}). No trade until one side breaks."
+    return out
+
+
+def load_gap_track():
+    if os.path.exists(GAP_TRACK):
+        with open(GAP_TRACK) as f:
+            return json.load(f).get("entries", [])
+    return []
+
+
+def save_gap_track(entries):
+    with open(GAP_TRACK, "w") as f:
+        json.dump({"entries": entries[-300:]}, f, indent=1)
+
+
+def grade_gaps(nifty):
+    """Evening run: fill in the actual opening gap for forecasts made this morning."""
+    entries = load_gap_track()
+    dates = [d.strftime("%Y-%m-%d") for d in nifty.index]
+    for e in entries:
+        if e.get("actual_pct") is None and e["date"] in dates:
+            i = dates.index(e["date"])
+            if i > 0:
+                act = float(nifty["Open"].iloc[i] / nifty["Close"].iloc[i - 1] - 1) * 100
+                e["actual_pct"], e["actual_open"] = round(act, 2), round(float(nifty["Open"].iloc[i]), 1)
+                e["actual_call"] = gap_label(act)
+                e["right_direction"] = bool((gap_label(act) == "Flat open" and e["call"] == "Flat open") or
+                                            (np.sign(act) == np.sign(e["pct"]) and abs(act) >= GAP_FLAT and e["call"] != "Flat open"))
+                e["error_pts"] = round(float(nifty["Open"].iloc[i]) - e["open_est"], 1)
+    save_gap_track(entries)
+    graded = [e for e in entries if e.get("actual_pct") is not None]
+    summary = {"graded": len(graded),
+               "hit_rate": round(sum(bool(e["right_direction"]) for e in graded) / len(graded) * 100, 1) if graded else None,
+               "avg_error_pts": round(float(np.mean([abs(e["error_pts"]) for e in graded])), 1) if graded else None}
+    return entries[::-1][:30], summary
+
+
+def log_gap_prediction(pred):
+    if pred.get("status") != "ready":
+        return
+    date = dt.datetime.strptime(pred["for_date"], "%a %d %b %Y").strftime("%Y-%m-%d")
+    entries = [e for e in load_gap_track() if e["date"] != date]
+    entries.append({"date": date, "call": pred["call"], "pct": pred["pct"], "pts": pred["pts"],
+                    "open_est": pred["open_est"], "method": pred["method"], "actual_pct": None})
+    entries.sort(key=lambda e: e["date"])
+    save_gap_track(entries)
+
+
+def get_global(demo, as_of):
+    try:
+        rows, since = demo_global() if demo else fetch_global(as_of)
+    except Exception as e:
+        print("Global markets failed:", e)
+        rows, since = [], {}
+    return {"rows": rows, "since_close": since, "updated": dt.datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")}
+
+
+def premarket(demo):
+    """Morning run (~8:15 AM IST): news, global markets and the opening-gap forecast."""
+    with open("data.json") as f:
+        data = json.load(f)
+    fresh = get_news(demo)
+    if not fresh["fii_dii"] and data.get("news", {}).get("fii_dii"):
+        fresh["fii_dii"] = data["news"]["fii_dii"]
+    data["news"] = fresh
+    data["global"] = get_global(demo, data["as_of"])
+    gift = get_gift(demo, data["last"]["close"])
+    pm = data.get("premarket", {})
+    pred = predict_gap(data["last"]["close"], data["as_of"], data["levels"], pm.get("model"),
+                       data["global"]["since_close"], gift, pm.get("gift_eve"))
+    pred["gift"] = gift
+    log_gap_prediction(pred)
+    entries = load_gap_track()
+    pm.update(status=pred.get("status"), prediction=pred, history=entries[::-1][:30])
+    data["premarket"] = pm
+    with open("data.json", "w") as f:
+        json.dump(data, f)
+    print("Pre-market:", pred.get("call"), pred.get("pct"), "via", pred.get("method"))
+
+
 def news_only(demo):
     """Refresh just the news section of an existing data.json (used by the morning run)."""
     with open("data.json") as f:
@@ -813,11 +1054,28 @@ def build_alerts(df, oc, vix, vix_prev, bias, lv):
     return A
 
 
+def premarket_evening(demo, df, close):
+    """Evening run: grade this morning's forecast, refit the model, and note
+    where GIFT Nifty stood at Nifty's close (the reference for tomorrow)."""
+    hist, summary = grade_gaps(df)
+    try:
+        model = fit_gap_model(df[["Open", "Close"]], demo)
+    except Exception as e:
+        print("Gap model fit failed:", e)
+        model = None
+    gift = get_gift(demo, close)
+    return {"status": "waiting", "model": model, "gift_eve": gift["price"] if gift else None,
+            "history": hist, "summary": summary,
+            "next_run": next_session(df.index[-1].date()).strftime("%a %d %b") + ", about 8:15 AM IST"}
+
+
 # =====================================================================
 # Main
 # =====================================================================
 def main():
     demo = "--demo" in sys.argv
+    if "--premarket" in sys.argv:
+        return premarket(demo)
     if "--news-only" in sys.argv:
         return news_only(demo)
     df, vix_s = load_demo() if demo else load_live()
@@ -882,6 +1140,8 @@ def main():
         "playbook": build_playbook(last, lv, oc, vix, bias),
         "alerts": build_alerts(df, oc, vix, vix_prev, bias, lv),
         "news": get_news(demo),
+        "global": get_global(demo, as_of.strftime("%Y-%m-%d")),
+        "premarket": premarket_evening(demo, df, float(last.Close)),
     }
     with open("data.json", "w") as f:
         json.dump(data, f)
